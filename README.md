@@ -2,22 +2,22 @@ _**NOTE:** `OBS-NDI` was renamed to `DistroAV` ~2024/06 per [obsproject.com](htt
 
 DistroAV _(Formerly OBS-NDI)_
 ==============
-Network Audio/Video in OBS-Studio using NDI® technology
+<div align="center">
+<h3>Network Audio/Video in OBS-Studio using NDI® technology</h3>  
 
-## Status
+[![GitHub](https://img.shields.io/github/license/DistroAV/DistroAV)](https://github.com/DistroAV/DistroAV/blob/master/LICENSE)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/DistroAV/DistroAV/push.yaml?label=master)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/DistroAV/DistroAV)](https://github.com/DistroAV/DistroAV/releases/latest)  
+[![Discord](https://discordapp.com/api/guilds/1082173788101279746/widget.png?style=banner2)](https://discord.gg/ZuTxbUK3ug)  
+(English Speaking)  
 
-`master`: [![master: Push](https://github.com/obs-ndi/obs-ndi/actions/workflows/push.yaml/badge.svg)](https://github.com/obs-ndi/obs-ndi/actions/workflows/push.yaml)
-`develop`: [![develop: Pull Request](https://github.com/obs-ndi/obs-ndi/actions/workflows/pr-pull.yaml/badge.svg?branch=develop)](https://github.com/obs-ndi/obs-ndi/actions/workflows/pr-pull.yaml)
+[![Total downloads](https://img.shields.io/github/downloads/DistroAV/DistroAV/total)](https://github.com/DistroAV/DistroAV/releases)
+![Flathub](https://img.shields.io/flathub/downloads/com.obsproject.Studio.Plugin.NDI?label=Flathub%20Installs)
+[![Open Collective backers and sponsors](https://img.shields.io/opencollective/all/distroav)](https://opencollective.com/distroav/donate)  
+[(Support this community project: Make a donation)](https://opencollective.com/distroav)
+</div>
 
-
-## Project's Community
-
-Consider supporting the project with your [Donations](https://opencollective.com/obs-ndi)
-
-[![Discord Shield](https://discordapp.com/api/guilds/1082173788101279746/widget.png?style=banner2)](https://discord.gg/ZuTxbUK3ug)  
-(English Speaking)
-
-- DistroAV is an independent open-source project, maintained exclusively by volunteers.
+_DistroAV is an independent open-source project, maintained exclusively by volunteers._
 
 
 ## Plugin features
@@ -31,13 +31,14 @@ Consider supporting the project with your [Donations](https://opencollective.com
 
 See [Installation Wiki](https://github.com/obs-ndi/obs-ndi/wiki/1.-Installation)
 
+
 ## Requirements
 
 * OBS - [Open Braodcaster Software](https://obsproject.com/download) >= 30.0.0 
-* NDI® 6 Runtime - [Installed separately](#installation)
+* [NDI Runtime](https://github.com/DistroAV/DistroAV/wiki/1.-Installation#required---ndi-runtime) >= NDI 5
 
 
-## NDI® Format Supported
+## NDI Format Supported
 
 DistroAV supports NDI® High Bandwidth (encode/send, decode/receive) and NDI® HX2 (decode/receive).
 [Read more more about NDI® Formats on NDI.video](https://ndi.video/tech/formats/)
@@ -57,17 +58,17 @@ This plugin is a community effort to support the NDI® Protocol, not all the fea
 
 | Feature | Supported | Since version |
 | --------- | ------------------- | ---------------- |
-| NDI High Bandwidth Decoding | Yes | 0 |
-| NDI High Bandwidth Encoding | Yes | 0 |
-| NDI HX2 Decoding | Yes |  |
+| NDI High Bandwidth Decoding | Yes | <4.0 |
+| NDI High Bandwidth Encoding | Yes | <4.0 |
+| NDI HX2 Decoding | Yes | <4.0 |
 | NDI HX2 Encoding | No |  |
-| NDI HX3 Decoding | Yes |  |
+| NDI HX3 Decoding | Yes | <4.0 |
 | NDI HX3 Encoding | No |  |
 | HDR Decoding | tbc |  |
 | HDR Encoding | No |  |
 | Tally Status | Yes | <4.0 |
 | Alpha Channel | Yes | <4.0 |
-| PTZ control | TBR | 6.0.0 (planned) |
+| PTZ control | Planned | 6.0.0 (expected) |
 | NDI Bridge Utility Embedded | No |  |
 
 
@@ -99,3 +100,12 @@ See [Development Wiki](https://github.com/obs-ndi/obs-ndi/wiki/3.-Development)
 - Send multiple audio stream with the video from an encoder
 - Send the tally status to a camera operator
 - Receive the tally status of an AV Source
+
+
+## Fun facts
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=DistroAV/DistroAV&type=Date&theme=dark" />
+  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=DistroAV/DistroAV&type=Date" />
+  <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=DistroAV/DistroAV&type=Date" />
+</picture>
