@@ -115,41 +115,6 @@ typedef struct ndi_source_config_t {
 	NDIlib_tally_t tally;
 } ndi_source_config_t;
 
-<<<<<<< HEAD
-typedef struct ndi_video_tick_context_t {
-	ptz_t ptz;
-	NDIlib_tally_t tally;
-
-	obs_source_audio obs_audio_frame;
-	obs_source_frame obs_video_frame;
-
-	NDIlib_recv_create_v3_t recv_desc;
-	;
-
-	NDIlib_recv_instance_t ndi_receiver;
-	NDIlib_video_frame_v2_t video_frame2;
-
-	NDIlib_metadata_frame_t metadata_frame;
-	NDIlib_framesync_instance_t ndi_frame_sync;
-	NDIlib_audio_frame_v2_t audio_frame2;
-	int64_t timestamp_audio;
-	int64_t timestamp_video;
-
-	NDIlib_audio_frame_v3_t audio_frame3;
-	NDIlib_frame_type_e frame_received;
-	const char *obs_source_name;
-	ndi_video_tick_context_t()
-	{
-		memset(this, 0, sizeof(*this));
-		obs_audio_frame = {};
-		obs_video_frame = {};
-		recv_desc.allow_video_fields = true;
-		frame_received = NDIlib_frame_type_none;
-	}
-} ndi_video_tick_context_t;
-
-=======
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 typedef struct ndi_source_t {
 	obs_source_t *obs_source;
 	ndi_source_config_t config;
@@ -428,22 +393,6 @@ void deactivate_source_output_video_texture(obs_source_t *obs_source)
 	obs_source_output_video(obs_source, NULL);
 }
 
-<<<<<<< HEAD
-void ndi_video_tick_process_audio2(ndi_source_config_t *config,
-				   NDIlib_audio_frame_v2_t *ndi_audio_frame2,
-				   obs_source_t *obs_source,
-				   obs_source_audio *obs_audio_frame);
-
-void ndi_video_tick_process_audio3(ndi_source_config_t *config,
-				   NDIlib_audio_frame_v3_t *ndi_audio_frame3,
-				   obs_source_t *obs_source,
-				   obs_source_audio *obs_audio_frame);
-
-void ndi_video_tick_process_video2(ndi_source_config_t *config,
-				   NDIlib_video_frame_v2_t *ndi_video_frame2,
-				   obs_source *obs_source,
-				   obs_source_frame *obs_video_frame);
-=======
 void ndi_source_thread_process_audio2(ndi_source_config_t *config,
 				      NDIlib_audio_frame_v2_t *ndi_audio_frame2,
 				      obs_source_t *obs_source,
@@ -458,7 +407,6 @@ void ndi_source_thread_process_video2(ndi_source_config_t *config,
 				      NDIlib_video_frame_v2_t *ndi_video_frame2,
 				      obs_source *obs_source,
 				      obs_source_frame *obs_video_frame);
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 
 void *ndi_source_thread(void *data)
 {
@@ -488,14 +436,10 @@ void *ndi_source_thread(void *data)
 	NDIlib_audio_frame_v3_t audio_frame3;
 	NDIlib_frame_type_e frame_received = NDIlib_frame_type_none;
 
-<<<<<<< HEAD
-	{ // *** To indent to same level as when this was a thread loop
-=======
 	//
 	// Main NDI receiver loop: BEGIN
 	//
 	while (s->running) {
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 		//
 		// reset_ndi_receiver: BEGIN
 		//
@@ -503,22 +447,12 @@ void *ndi_source_thread(void *data)
 			s->config.reset_ndi_receiver = false;
 
 			// If config.ndi_receiver_name changed, then so did obs_source_name
-<<<<<<< HEAD
-			s->tc.obs_source_name =
-				obs_source_get_name(s->obs_source);
-=======
 			obs_source_name = obs_source_get_name(s->obs_source);
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 
 			//
 			// Update recv_desc.p_ndi_recv_name
 			//
-<<<<<<< HEAD
-			s->tc.recv_desc.p_ndi_recv_name =
-				s->config.ndi_receiver_name;
-=======
 			recv_desc.p_ndi_recv_name = s->config.ndi_receiver_name;
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 			obs_log(LOG_DEBUG,
 				"'%s' ndi_source_thread: reset_ndi_receiver; Setting recv_desc.p_ndi_recv_name='%s'",
 				obs_source_name, //
@@ -597,16 +531,9 @@ void *ndi_source_thread(void *data)
 				recv_desc.p_ndi_recv_name,
 				recv_desc.source_to_connect_to.p_ndi_name);
 			obs_log(LOG_VERBOSE,
-<<<<<<< HEAD
-				"'%s' ndi_video_tick: reset_ndi_receiver: +ndi_receiver = ndiLib->recv_create_v3(&recv_desc)",
-				s->tc.obs_source_name);
-			s->tc.ndi_receiver =
-				ndiLib->recv_create_v3(&s->tc.recv_desc);
-=======
 				"'%s' ndi_source_thread: reset_ndi_receiver: +ndi_receiver = ndiLib->recv_create_v3(&recv_desc)",
 				obs_source_name);
 			ndi_receiver = ndiLib->recv_create_v3(&recv_desc);
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 			obs_log(LOG_VERBOSE,
 				"'%s' ndi_source_thread: reset_ndi_receiver: -ndi_receiver = ndiLib->recv_create_v3(&recv_desc)",
 				obs_source_name);
@@ -620,11 +547,7 @@ void *ndi_source_thread(void *data)
 			}
 
 			// Deactivate the source output video texture when using Audio only
-<<<<<<< HEAD
-			if (s->tc.recv_desc.bandwidth ==
-=======
 			if (recv_desc.bandwidth ==
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 			    NDIlib_recv_bandwidth_audio_only) {
 				obs_log(LOG_INFO,
 					"'%s' ndi_source_thread: reset_ndi_receiver: Audio Only: Deactivate source output video texture",
@@ -671,11 +594,7 @@ void *ndi_source_thread(void *data)
 					"'%s' ndi_source_thread: reset_ndi_receiver; Sending NDI metadata '%s'",
 					obs_source_name, //
 					hwAccelMetadata.p_data);
-<<<<<<< HEAD
-				ndiLib->recv_send_metadata(s->tc.ndi_receiver,
-=======
 				ndiLib->recv_send_metadata(ndi_receiver,
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 							   &hwAccelMetadata);
 			}
 
@@ -683,33 +602,19 @@ void *ndi_source_thread(void *data)
 				timestamp_audio = 0;
 				timestamp_video = 0;
 				obs_log(LOG_VERBOSE,
-<<<<<<< HEAD
-					"'%s' ndi_video_tick: +ndi_frame_sync = ndiLib->framesync_create(ndi_receiver)",
-					s->tc.obs_source_name);
-				s->tc.ndi_frame_sync = ndiLib->framesync_create(
-					s->tc.ndi_receiver);
-=======
 					"'%s' ndi_source_thread: +ndi_frame_sync = ndiLib->framesync_create(ndi_receiver)",
 					obs_source_name);
 				ndi_frame_sync =
 					ndiLib->framesync_create(ndi_receiver);
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 				obs_log(LOG_VERBOSE,
 					"'%s' ndi_source_thread: -ndi_frame_sync = ndiLib->framesync_create(ndi_receiver); ndi_frame_sync=%p",
 					obs_source_name, //
 					ndi_frame_sync);
 				if (!ndi_frame_sync) {
 					obs_log(LOG_ERROR,
-<<<<<<< HEAD
-						"'%s' ndi_video_tick: Cannot create ndi_frame_sync for NDI source '%s'",
-						s->tc.obs_source_name, //
-						s->tc.recv_desc
-							.source_to_connect_to
-=======
 						"'%s' ndi_source_thread: Cannot create ndi_frame_sync for NDI source '%s'",
 						obs_source_name, //
 						recv_desc.source_to_connect_to
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 							.p_ndi_name);
 					break;
 				}
@@ -724,19 +629,11 @@ void *ndi_source_thread(void *data)
 		// check if there are any connections.
 		// If not then micro-pause and restart the loop.
 		//
-<<<<<<< HEAD
-		if (ndiLib->recv_get_no_connections(s->tc.ndi_receiver) == 0) {
-#if 0
-			obs_log(LOG_INFO,
-					"'%s' ndi_video_tick: No connection; sleep and restart loop",
-					s->tc.obs_source_name);
-=======
 		if (ndiLib->recv_get_no_connections(ndi_receiver) == 0) {
 #if 0
 			obs_log(LOG_INFO,
 			     "'%s' ndi_source_thread: No connection; sleep and restart loop",
 			     obs_source_name);
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 #endif
 			//blog(LOG_INFO, "s");//leep");
 			std::this_thread::sleep_for(
@@ -749,28 +646,6 @@ void *ndi_source_thread(void *data)
 		//
 		if (s->config.ptz.enabled) {
 			const static float tollerance = 0.001f;
-<<<<<<< HEAD
-			if (fabs(s->config.ptz.pan - s->tc.ptz.pan) >
-				    tollerance ||
-			    fabs(s->config.ptz.tilt - s->tc.ptz.tilt) >
-				    tollerance ||
-			    fabs(s->config.ptz.zoom - s->tc.ptz.zoom) >
-				    tollerance) {
-				s->tc.ptz = s->config.ptz;
-				if (ndiLib->recv_ptz_is_supported(
-					    s->tc.ndi_receiver)) {
-					obs_log(LOG_INFO,
-						"'%s' ndi_video_tick: ptz changed; Sending PTZ pan=%f, tilt=%f, zoom=%f",
-						s->tc.obs_source_name, //
-						s->tc.ptz.pan, s->tc.ptz.tilt,
-						s->tc.ptz.zoom);
-					ndiLib->recv_ptz_pan_tilt(
-						s->tc.ndi_receiver,
-						s->tc.ptz.pan, s->tc.ptz.tilt);
-					ndiLib->recv_ptz_zoom(
-						s->tc.ndi_receiver,
-						s->tc.ptz.zoom);
-=======
 			if (fabs(s->config.ptz.pan - ptz.pan) > tollerance ||
 			    fabs(s->config.ptz.tilt - ptz.tilt) > tollerance ||
 			    fabs(s->config.ptz.zoom - ptz.zoom) > tollerance) {
@@ -786,7 +661,6 @@ void *ndi_source_thread(void *data)
 								  ptz.tilt);
 					ndiLib->recv_ptz_zoom(ndi_receiver,
 							      ptz.zoom);
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 				}
 			}
 		}
@@ -800,21 +674,6 @@ void *ndi_source_thread(void *data)
 			s->config.tally2.on_preview,
 			s->config.tally2.on_program);
 #endif
-<<<<<<< HEAD
-		auto config = Config::Current();
-		if ((config->TallyPreviewEnabled &&
-		     s->config.tally.on_preview != s->tc.tally.on_preview) ||
-		    (config->TallyProgramEnabled &&
-		     s->config.tally.on_program != s->tc.tally.on_program)) {
-			s->tc.tally.on_preview = s->config.tally.on_preview;
-			s->tc.tally.on_program = s->config.tally.on_program;
-			obs_log(LOG_INFO,
-				"'%s' ndi_video_tick: tally changed; Sending tally on_preview=%d, on_program=%d",
-				s->tc.obs_source_name, //
-				s->tc.tally.on_preview, s->tc.tally.on_program);
-			ndiLib->recv_set_tally(s->tc.ndi_receiver,
-					       &s->tc.tally);
-=======
 		if ((config->TallyPreviewEnabled &&
 		     s->config.tally.on_preview != tally.on_preview) ||
 		    (config->TallyProgramEnabled &&
@@ -826,7 +685,6 @@ void *ndi_source_thread(void *data)
 				obs_source_name, //
 				tally.on_preview, tally.on_program);
 			ndiLib->recv_set_tally(ndi_receiver, &tally);
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 		}
 
 		if (ndi_frame_sync) {
@@ -842,21 +700,6 @@ void *ndi_source_thread(void *data)
 				ndi_frame_sync, &audio_frame2,
 				0, // "Your desired sample rate. 0 for “use source”."
 				0, // "Your desired channel count. 0 for “use source”."
-<<<<<<< HEAD
-				1600);
-			if (s->tc.audio_frame2.p_data &&
-			    (s->tc.audio_frame2.timestamp >
-			     s->tc.timestamp_audio)) {
-				//blog(LOG_INFO, "a");//udio_frame");
-				s->tc.timestamp_audio =
-					s->tc.audio_frame2.timestamp;
-				ndi_video_tick_process_audio2(
-					&s->config, &s->tc.audio_frame2,
-					s->obs_source, &s->tc.obs_audio_frame);
-			}
-			ndiLib->framesync_free_audio(s->tc.ndi_frame_sync,
-						     &s->tc.audio_frame2);
-=======
 				1024);
 			if (audio_frame2.p_data &&
 			    (audio_frame2.timestamp > timestamp_audio)) {
@@ -868,7 +711,6 @@ void *ndi_source_thread(void *data)
 			}
 			ndiLib->framesync_free_audio(ndi_frame_sync,
 						     &audio_frame2);
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 
 			//
 			// VIDEO
@@ -877,20 +719,6 @@ void *ndi_source_thread(void *data)
 			ndiLib->framesync_capture_video(
 				ndi_frame_sync, &video_frame2,
 				NDIlib_frame_format_type_progressive);
-<<<<<<< HEAD
-			if (s->tc.video_frame2.p_data &&
-			    (s->tc.video_frame2.timestamp >
-			     s->tc.timestamp_video)) {
-				//blog(LOG_INFO, "v");//ideo_frame");
-				s->tc.timestamp_video =
-					s->tc.video_frame2.timestamp;
-				ndi_video_tick_process_video2(
-					&s->config, &s->tc.video_frame2,
-					s->obs_source, &s->tc.obs_video_frame);
-			}
-			ndiLib->framesync_free_video(s->tc.ndi_frame_sync,
-						     &s->tc.video_frame2);
-=======
 			if (video_frame2.p_data &&
 			    (video_frame2.timestamp > timestamp_video)) {
 				//blog(LOG_INFO, "v");//ideo_frame");
@@ -901,7 +729,6 @@ void *ndi_source_thread(void *data)
 			}
 			ndiLib->framesync_free_video(ndi_frame_sync,
 						     &video_frame2);
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 
 			// TODO: More accurate sleep that subtracts the duration of this loop iteration?
 			std::this_thread::sleep_for(
@@ -910,16 +737,10 @@ void *ndi_source_thread(void *data)
 			//
 			// !ndi_frame_sync
 			//
-<<<<<<< HEAD
-			s->tc.frame_received = ndiLib->recv_capture_v3(
-				s->tc.ndi_receiver, &s->tc.video_frame2,
-				&s->tc.audio_frame3, nullptr, 100);
-=======
 			frame_received = ndiLib->recv_capture_v3(ndi_receiver,
 								 &video_frame2,
 								 &audio_frame3,
 								 nullptr, 100);
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 
 			if (frame_received == NDIlib_frame_type_audio) {
 				//
@@ -930,15 +751,9 @@ void *ndi_source_thread(void *data)
 					&s->config, &audio_frame3,
 					s->obs_source, &obs_audio_frame);
 
-<<<<<<< HEAD
-				ndiLib->recv_free_audio_v3(s->tc.ndi_receiver,
-							   &s->tc.audio_frame3);
-				return;
-=======
 				ndiLib->recv_free_audio_v3(ndi_receiver,
 							   &audio_frame3);
 				continue;
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 			}
 
 			if (frame_received == NDIlib_frame_type_video) {
@@ -950,15 +765,9 @@ void *ndi_source_thread(void *data)
 					&s->config, &video_frame2,
 					s->obs_source, &obs_video_frame);
 
-<<<<<<< HEAD
-				ndiLib->recv_free_video_v2(s->tc.ndi_receiver,
-							   &s->tc.video_frame2);
-				return;
-=======
 				ndiLib->recv_free_video_v2(ndi_receiver,
 							   &video_frame2);
 				continue;
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 			}
 		}
 	}
@@ -981,17 +790,10 @@ void *ndi_source_thread(void *data)
 	return nullptr;
 }
 
-<<<<<<< HEAD
-void ndi_video_tick_process_audio2(ndi_source_config_t *config,
-				   NDIlib_audio_frame_v2_t *ndi_audio_frame2,
-				   obs_source_t *obs_source,
-				   obs_source_audio *obs_audio_frame)
-=======
 void ndi_source_thread_process_audio2(ndi_source_config_t *config,
 				      NDIlib_audio_frame_v2_t *ndi_audio_frame2,
 				      obs_source_t *obs_source,
 				      obs_source_audio *obs_audio_frame)
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 {
 	if (!config->audio_enabled) {
 		return;
@@ -1027,17 +829,10 @@ void ndi_source_thread_process_audio2(ndi_source_config_t *config,
 	obs_source_output_audio(obs_source, obs_audio_frame);
 }
 
-<<<<<<< HEAD
-void ndi_video_tick_process_audio3(ndi_source_config_t *config,
-				   NDIlib_audio_frame_v3_t *ndi_audio_frame3,
-				   obs_source_t *obs_source,
-				   obs_source_audio *obs_audio_frame)
-=======
 void ndi_source_thread_process_audio3(ndi_source_config_t *config,
 				      NDIlib_audio_frame_v3_t *ndi_audio_frame3,
 				      obs_source_t *obs_source,
 				      obs_source_audio *obs_audio_frame)
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 {
 	if (!config->audio_enabled) {
 		return;
@@ -1073,17 +868,10 @@ void ndi_source_thread_process_audio3(ndi_source_config_t *config,
 	obs_source_output_audio(obs_source, obs_audio_frame);
 }
 
-<<<<<<< HEAD
-void ndi_video_tick_process_video2(ndi_source_config_t *config,
-				   NDIlib_video_frame_v2_t *ndi_video_frame,
-				   obs_source *obs_source,
-				   obs_source_frame *obs_video_frame)
-=======
 void ndi_source_thread_process_video2(ndi_source_config_t *config,
 				      NDIlib_video_frame_v2_t *ndi_video_frame,
 				      obs_source *obs_source,
 				      obs_source_frame *obs_video_frame)
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 {
 	switch (ndi_video_frame->FourCC) {
 	case NDIlib_FourCC_type_BGRA:
@@ -1158,23 +946,7 @@ void ndi_source_thread_stop(ndi_source_t *s)
 {
 	if (s->running) {
 		s->running = false;
-<<<<<<< HEAD
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-		if (s->tc.ndi_frame_sync) {
-			ndiLib->framesync_destroy(s->tc.ndi_frame_sync);
-			s->tc.ndi_frame_sync = nullptr;
-		}
-
-		if (s->tc.ndi_receiver) {
-			ndiLib->recv_destroy(s->tc.ndi_receiver);
-			s->tc.ndi_receiver = nullptr;
-		}
-
-=======
 		pthread_join(s->av_thread, NULL);
->>>>>>> parent of c71657c (Use video_tick for source loop instead of a thread)
 		auto obs_source = s->obs_source;
 		auto obs_source_name = obs_source_get_name(obs_source);
 		obs_log(LOG_INFO,
