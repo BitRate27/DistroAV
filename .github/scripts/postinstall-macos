@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Define the dirs to be deleted
+DIRS_TO_DELETE=(
+  "$HOME/Library/Application Support/obs-studio/plugins/obs-ndi.plugin"
+  "/Library/Application Support/obs-studio/plugins/obs-ndi.plugin"
+)
+
+# Loop through the dirs and delete them
+for DIR in "${DIRS_TO_DELETE[@]}"; do
+  if [ -d "$DIR" ]; then
+    rm -rf "$DIR"
+    echo "Deleted $DIR"
+  else
+    echo "Directory $DIR does not exist"
+  fi
+done
+
+exit 0
