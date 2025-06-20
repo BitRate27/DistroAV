@@ -19,6 +19,8 @@
 #include "obs-module.h"
 #include "plugin-support.h"
 
+#include "obs-support/sync-debug.h"
+
 #include "forms/output-settings.h"
 #include "forms/update.h"
 #include "main-output.h"
@@ -402,7 +404,9 @@ void obs_module_unload(void)
 		delete loaded_lib;
 	}
 
+	obs_clear_last_log_time();
 	obs_log(LOG_DEBUG, "-obs_module_unload(): goodbye!");
+
 }
 
 const NDIlib_v5 *load_ndilib()
@@ -417,8 +421,12 @@ const NDIlib_v5 *load_ndilib()
 	// https://github.com/DistroAV/DistroAV/blob/master/lib/ndi/NDI%20SDK%20Documentation.pdf
 	// "6.1 LOCATING THE LIBRARY
 	// ... the redistributable on MacOS is installed within `/usr/local/lib` ..."
+	// Flatpak install will look for the NDI lib in /app/plugins/DistroAV/extra/lib
 	locations << "/usr/lib";
 	locations << "/usr/local/lib";
+#if defined(Q_OS_LINUX)
+	locations << "/app/plugins/DistroAV/extra/lib";
+#endif
 #endif
 	auto lib_path = QString();
 #if defined(Q_OS_LINUX)
