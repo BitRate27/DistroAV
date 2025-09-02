@@ -37,6 +37,21 @@ if(ENABLE_QT)
   )
 endif()
 
+find_package(
+  FFmpeg
+  6.1
+  REQUIRED avcodec avfilter avdevice avutil swscale avformat swresample
+)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE 
+    FFmpeg::avcodec
+    FFmpeg::avfilter
+    FFmpeg::avformat
+    FFmpeg::avdevice
+    FFmpeg::avutil
+    FFmpeg::swscale
+    FFmpeg::swresample
+)
+
 target_sources(
   ${CMAKE_PROJECT_NAME}
   PRIVATE
@@ -63,6 +78,9 @@ target_sources(
     src/premultiplied-alpha-filter.cpp
     src/preview-output.cpp
     src/preview-output.h
+    src/ffmpeg-receiver.c
+    src/ffmpeg-sender.c
+    src/ffmpeg-video-stream.h
 )
 
 set(valid_uuid FALSE)

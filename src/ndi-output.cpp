@@ -16,6 +16,8 @@
 ******************************************************************************/
 
 #include "plugin-main.h"
+#include "ffmpeg-video-stream.h"
+
 // #include "plugin-support.h"
 
 static FORCE_INLINE uint32_t min_uint32(uint32_t a, uint32_t b)
@@ -62,8 +64,8 @@ typedef struct {
 
 	bool started;
 
-	NDIlib_send_instance_t ndi_sender;
-
+	// NDIlib_send_instance_t ndi_sender;
+	VideoSender* ndi_sender;
 	uint32_t frame_width;
 	uint32_t frame_height;
 	NDIlib_FourCC_video_type_e frame_fourcc;
@@ -219,7 +221,15 @@ bool ndi_output_start(void *data)
 	send_desc.clock_video = false;
 	send_desc.clock_audio = false;
 
-	o->ndi_sender = ndiLib->send_create(&send_desc);
+	o->ndi_sender = video_sender_create(video_output_get_width(video), 
+										video_output_get_height(video), 
+										1234);// ndiLib->send_create(&send_desc);
+	if (video_sender_wait_connection(o->ndi_sender) < 0) {
+		video_sender_destroy(o->ndi_sender);
+		o->ndi_sender = nullptr;
+		o->started = false;
+		return o->started;
+	}
 	if (o->ndi_sender) {
 		o->started = obs_output_begin_data_capture(o->output, flags);
 		if (o->started) {
@@ -268,7 +278,8 @@ void ndi_output_stop(void *data, uint64_t)
 
 		if (o->ndi_sender) {
 			obs_log(LOG_DEBUG, "ndi_output_stop: +ndiLib->send_destroy(o->ndi_sender)");
-			ndiLib->send_destroy(o->ndi_sender);
+			video_sender_destroy(o->ndi_sender);
+			//ndiLib->send_destroy(o->ndi_sender);
 			obs_log(LOG_DEBUG, "ndi_output_stop: -ndiLib->send_destroy(o->ndi_sender)");
 			o->ndi_sender = nullptr;
 		}
@@ -336,7 +347,8 @@ void ndi_output_rawvideo(void *data, video_data *frame)
 		video_frame.line_stride_in_bytes = frame->linesize[0];
 	}
 
-	ndiLib->send_send_video_async_v2(o->ndi_sender, &video_frame);
+	//ndiLib->send_send_video_async_v2(o->ndi_sender, &video_frame);
+	video_sender_send_frame(o->ndi_sender,video_frame.p_data);
 }
 
 void ndi_output_rawaudio(void *data, audio_data *frame)
@@ -377,7 +389,7 @@ void ndi_output_rawaudio(void *data, audio_data *frame)
 
 	audio_frame.p_data = o->audio_conv_buffer;
 
-	ndiLib->send_send_audio_v3(o->ndi_sender, &audio_frame);
+	//ndiLib->send_send_audio_v3(o->ndi_sender, &audio_frame);
 }
 
 obs_output_info create_ndi_output_info()
