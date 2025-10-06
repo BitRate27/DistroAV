@@ -28,17 +28,22 @@
 
 #define PROP_SOURCE "omt_source_name"
 #define PROP_BEHAVIOR "omt_behavior"
-#define PROP_TIMEOUT "omt_behavior_timeout"
-#define PROP_BANDWIDTH "omt_bw_mode"
-#define PROP_YUV_RANGE "yuv_range"
-#define PROP_YUV_COLORSPACE "yuv_colorspace"
-#define PROP_LATENCY "latency"
-#define PROP_AUDIO "omt_audio"
+#define PROP_TIMEOUT "omt_timeout"
+#define PROP_QUALITY "omt_quality"
+#define PROP_COLOR_SPACE "omt_colorspace"
+#define PROP_PREVIEW "omt_preview"
 
-#define PROP_BW_UNDEFINED -1
-#define PROP_BW_HIGHEST 0
-#define PROP_BW_LOWEST 1
-#define PROP_BW_AUDIO_ONLY 2
+#define PROP_QUALITY_DEFAULT -1
+#define PROP_QUALITY_LOW 0
+#define PROP_QUALITY_MEDIUM 1
+#define PROP_QUALITY_HIGH 2
+
+#define PROP_CS_DEFAULT -1
+#define PROP_CS_601 0
+#define PROP_CS_709 1
+#define PROP_CS_709_P010 2
+#define PROP_CS_2100_HLG_P010 3
+#define PROP_CS_2100_PQ_P010 4
 
 #define PROP_BEHAVIOR_KEEP_ACTIVE 0
 #define PROP_BEHAVIOR_STOP_RESUME_BLANK 1
@@ -47,17 +52,6 @@
 #define PROP_TIMEOUT_CLEAR_CONTENT 0
 #define PROP_TIMEOUT_KEEP_CONTENT 1
 
-#define PROP_YUV_RANGE_PARTIAL 1
-#define PROP_YUV_RANGE_FULL 2
-
-#define PROP_YUV_SPACE_BT601 1
-#define PROP_YUV_SPACE_BT709 2
-#define PROP_YUV_SPACE_BT2100 3
-
-#define PROP_LATENCY_UNDEFINED -1
-#define PROP_LATENCY_NORMAL 0
-#define PROP_LATENCY_LOW 1
-#define PROP_LATENCY_LOWEST 2
 
 typedef struct omt_source_config_t {
 	bool reset_omt_receiver = true;
@@ -75,6 +69,9 @@ typedef struct omt_source_config_t {
 	//
 	int behavior;
 	int timeout_action;
+	int quality;
+	int color_space;
+	bool preview;
 	video_range_type yuv_range;
 	video_colorspace yuv_colorspace;
 	bool audio_enabled;
@@ -123,24 +120,46 @@ static speaker_layout channel_count_to_layout(int channels)
 static video_colorspace prop_to_colorspace(int index)
 {
 	switch (index) {
-	case PROP_YUV_SPACE_BT601:
+	case PROP_CS_601:
 		return VIDEO_CS_601;
-	case PROP_YUV_SPACE_BT2100:
+	case PROP_CS_2100_HLG_P010:
 		return VIDEO_CS_2100_HLG;
+	case PROP_CS_2100_PQ_P010:
+		return VIDEO_CS_2100_PQ;
+	case PROP_CS_709:
+	case PROP_CS_709_P010:
 	default:
-	case PROP_YUV_SPACE_BT709:
 		return VIDEO_CS_709;
 	}
 }
 
-static video_range_type prop_to_range_type(int index)
+static video_trc prop_to_frame_trc(int index) 
 {
 	switch (index) {
-	case PROP_YUV_RANGE_FULL:
-		return VIDEO_RANGE_FULL;
+	case PROP_CS_2100_HLG_P010:
+		return VIDEO_TRC_HLG;
+	case PROP_CS_2100_PQ_P010:
+		return VIDEO_TRC_PQ;
+	case PROP_CS_601:
+	case PROP_CS_709:
+	case PROP_CS_709_P010:
 	default:
-	case PROP_YUV_RANGE_PARTIAL:
-		return VIDEO_RANGE_PARTIAL;
+		return VIDEO_TRC_DEFAULT;
+	}
+}
+
+static OMTQuality prop_to_quality(int index)
+{
+	switch (index) {
+	case PROP_QUALITY_HIGH:
+		return OMTQuality_High;
+	case PROP_QUALITY_MEDIUM:
+		return OMTQuality_Medium;
+	case PROP_QUALITY_LOW:
+		return OMTQuality_High;
+	case PROP_QUALITY_DEFAULT:
+	default:
+		return OMTQuality_Default;
 	}
 }
 
@@ -185,51 +204,28 @@ obs_properties_t *omt_source_getproperties(void *data)
 	obs_property_list_add_int(timeout_list, obs_module_text("NDIPlugin.SourceProps.Timeout.ClearContent"),
 				  PROP_TIMEOUT_CLEAR_CONTENT);
 
-	obs_property_t *bw_modes = obs_properties_add_list(props, PROP_BANDWIDTH,
-							   obs_module_text("NDIPlugin.SourceProps.Bandwidth"),
-							   OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-	obs_property_list_add_int(bw_modes, obs_module_text("NDIPlugin.BWMode.Highest"), PROP_BW_HIGHEST);
-	obs_property_list_add_int(bw_modes, obs_module_text("NDIPlugin.BWMode.Lowest"), PROP_BW_LOWEST);
-	obs_property_list_add_int(bw_modes, obs_module_text("NDIPlugin.BWMode.AudioOnly"), PROP_BW_AUDIO_ONLY);
-	obs_property_set_modified_callback(bw_modes, [](obs_properties_t *props_, obs_property_t *,
-							obs_data_t *settings_) {
-		bool is_audio_only = (obs_data_get_int(settings_, PROP_BANDWIDTH) == PROP_BW_AUDIO_ONLY);
+	obs_property_t *quality_list = obs_properties_add_list(props, PROP_QUALITY, "Suggested Quality",
+							     OBS_COMBO_TYPE_LIST,
+							     OBS_COMBO_FORMAT_INT);
+	if (quality_list != nullptr) {
+		obs_property_list_add_int(quality_list, "Default", PROP_QUALITY_DEFAULT);
+		obs_property_list_add_int(quality_list, "Low", PROP_QUALITY_LOW);
+		obs_property_list_add_int(quality_list, "Medium", PROP_QUALITY_MEDIUM);
+		obs_property_list_add_int(quality_list, "High", PROP_QUALITY_HIGH);
+	}
 
-		obs_property_t *yuv_range = obs_properties_get(props_, PROP_YUV_RANGE);
-		obs_property_t *yuv_colorspace = obs_properties_get(props_, PROP_YUV_COLORSPACE);
-
-		obs_property_set_visible(yuv_range, !is_audio_only);
-		obs_property_set_visible(yuv_colorspace, !is_audio_only);
-
-		return true;
-	});
-
-	obs_property_t *yuv_ranges = obs_properties_add_list(props, PROP_YUV_RANGE,
-							     obs_module_text("NDIPlugin.SourceProps.ColorRange"),
-							     OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-	obs_property_list_add_int(yuv_ranges, obs_module_text("NDIPlugin.SourceProps.ColorRange.Partial"),
-				  PROP_YUV_RANGE_PARTIAL);
-	obs_property_list_add_int(yuv_ranges, obs_module_text("NDIPlugin.SourceProps.ColorRange.Full"),
-				  PROP_YUV_RANGE_FULL);
-
-	obs_property_t *yuv_spaces = obs_properties_add_list(props, PROP_YUV_COLORSPACE,
-							     obs_module_text("NDIPlugin.SourceProps.ColorSpace"),
-							     OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-	obs_property_list_add_int(yuv_spaces, "BT.709", PROP_YUV_SPACE_BT709);
-	obs_property_list_add_int(yuv_spaces, "BT.601", PROP_YUV_SPACE_BT601);
-	obs_property_list_add_int(yuv_spaces, "BT.2100", PROP_YUV_SPACE_BT2100);
-
-	obs_property_t *latency_modes = obs_properties_add_list(props, PROP_LATENCY,
-								obs_module_text("NDIPlugin.SourceProps.Latency"),
-								OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-	obs_property_list_add_int(latency_modes, obs_module_text("NDIPlugin.SourceProps.Latency.Normal"),
-				  PROP_LATENCY_NORMAL);
-	obs_property_list_add_int(latency_modes, obs_module_text("NDIPlugin.SourceProps.Latency.Low"),
-				  PROP_LATENCY_LOW);
-	obs_property_list_add_int(latency_modes, obs_module_text("NDIPlugin.SourceProps.Latency.Lowest"),
-				  PROP_LATENCY_LOWEST);
-
-	obs_properties_add_bool(props, PROP_AUDIO, obs_module_text("NDIPlugin.SourceProps.Audio"));
+	auto colorspace_list = obs_properties_add_list(props, PROP_COLOR_SPACE, "Color Space",
+							OBS_COMBO_TYPE_LIST,
+							OBS_COMBO_FORMAT_INT);
+	if (colorspace_list != nullptr) {
+		obs_property_list_add_int(colorspace_list, "Default", PROP_CS_DEFAULT);
+		obs_property_list_add_int(colorspace_list, "BT601", PROP_CS_601);
+		obs_property_list_add_int(colorspace_list, "BT709", PROP_CS_709);
+		obs_property_list_add_int(colorspace_list, "BT709_P010", PROP_CS_709_P010);
+		obs_property_list_add_int(colorspace_list, "BT2100_HLG_P010", PROP_CS_2100_HLG_P010);
+		obs_property_list_add_int(colorspace_list, "BT2100_PQ_P010", PROP_CS_2100_PQ_P010);
+	}
+	auto preview = obs_properties_add_bool(props, PROP_PREVIEW, "Preview Mode");
 
 	obs_log(LOG_DEBUG, "-omt_source_getproperties(…)");
 
@@ -239,13 +235,11 @@ obs_properties_t *omt_source_getproperties(void *data)
 void omt_source_getdefaults(obs_data_t *settings)
 {
 	obs_log(LOG_DEBUG, "+omt_source_getdefaults(…)");
-	obs_data_set_default_int(settings, PROP_BANDWIDTH, PROP_BW_HIGHEST);
 	obs_data_set_default_int(settings, PROP_BEHAVIOR, PROP_BEHAVIOR_STOP_RESUME_LAST_FRAME);
 	obs_data_set_default_int(settings, PROP_TIMEOUT, PROP_TIMEOUT_KEEP_CONTENT);
-	obs_data_set_default_int(settings, PROP_YUV_RANGE, PROP_YUV_RANGE_PARTIAL);
-	obs_data_set_default_int(settings, PROP_YUV_COLORSPACE, PROP_YUV_SPACE_BT709);
-	obs_data_set_default_int(settings, PROP_LATENCY, PROP_LATENCY_NORMAL);
-	obs_data_set_default_bool(settings, PROP_AUDIO, true);
+	obs_data_set_default_int(settings, PROP_QUALITY, PROP_QUALITY_DEFAULT);
+	obs_data_set_default_int(settings, PROP_COLOR_SPACE, PROP_CS_DEFAULT);
+	obs_data_set_default_bool(settings, PROP_PREVIEW, false);	
 	obs_log(LOG_DEBUG, "-omt_source_getdefaults(…)");
 }
 
@@ -338,45 +332,16 @@ void *omt_source_thread(void *data)
 				recv_desc.p_omt_source_name);
 
 			//
-			// Update recv_desc.flags
+			// Update recv_desc
 			//
-			switch (s->config.bandwidth) {
-			case PROP_BW_HIGHEST:
-			default:
-				recv_desc.frameTypes = (OMTFrameType)(OMTFrameType_Audio | OMTFrameType_Video);
-				recv_desc.flags = OMTReceiveFlags_None;
-				break;
-			case PROP_BW_LOWEST:
-				recv_desc.frameTypes = (OMTFrameType)(OMTFrameType_Audio | OMTFrameType_Video);
-				recv_desc.flags = OMTReceiveFlags_Preview;
-				break;
-			case PROP_BW_AUDIO_ONLY:
-				recv_desc.frameTypes = OMTFrameType_Audio;
-				recv_desc.flags = OMTReceiveFlags_None;
-				break;
-			}
-			obs_log(LOG_DEBUG, "'%s' omt_source_thread: reset_omt_receiver; Setting recv_desc.frameTypes=%d, recv_desc.flags=%d",
-				obs_source_name, //
-				recv_desc.frameTypes,
-				recv_desc.flags);
+			recv_desc.frameTypes = (OMTFrameType)(OMTFrameType_Audio | OMTFrameType_Video);
+			
+			video_format_get_parameters(prop_to_colorspace(s->config.color_space), 
+				VIDEO_RANGE_PARTIAL,
+				obs_video_frame.color_matrix, obs_video_frame.color_range_min,
+				obs_video_frame.color_range_max);
 
-			//
-			// Update recv_desc.latency
-			//
-			/*
-			if (s->config.latency == PROP_LATENCY_NORMAL)
-				recv_desc.color_format = OMTlib_recv_color_format_UYVY_BGRA;
-			else
-				recv_desc.color_format = OMTlib_recv_color_format_fastest;
-			obs_log(LOG_DEBUG,
-				"'%s' omt_source_thread: reset_omt_receiver; Setting recv_desc.color_format=%d",
-				obs_source_name, //
-				recv_desc.color_format);
-			*/
-
-			video_format_get_parameters(s->config.yuv_colorspace, s->config.yuv_range,
-						    obs_video_frame.color_matrix, obs_video_frame.color_range_min,
-						    obs_video_frame.color_range_max);
+			obs_video_frame.trc = prop_to_frame_trc(s->config.color_space);
 
 			//
 			// recv_desc is fully populated;
@@ -403,7 +368,12 @@ void *omt_source_thread(void *data)
 
 			omt_receiver = omt_receive_create(recv_desc.p_omt_source_name, recv_desc.frameTypes,
 							  recv_desc.video_format, recv_desc.flags);
-
+			omt_receive_setsuggestedquality(omt_receiver, prop_to_quality(s->config.quality));
+			if (s->config.preview) {
+				recv_desc.flags = (OMTReceiveFlags_Preview);
+			} else {
+				recv_desc.flags = (OMTReceiveFlags_None);
+			}
 			obs_log(LOG_DEBUG,
 				"'%s' omt_source_thread: reset_omt_receiver: -omt_receiver = omtLib->recv_create_v3(&recv_desc)",
 				obs_source_name);
@@ -609,33 +579,26 @@ void omt_source_update(void *data, obs_data_t *settings)
 
 	s->config.omt_source_name = bstrdup(new_omt_source_name);
 
-	auto new_bandwidth = (int)obs_data_get_int(settings, PROP_BANDWIDTH);
-	reset_omt_receiver |= (s->config.bandwidth != new_bandwidth);
+	auto new_quality = (int)obs_data_get_int(settings, PROP_QUALITY);
+	reset_omt_receiver |= (s->config.quality != new_quality);
 	obs_log(LOG_DEBUG,
-		"'%s' omt_source_update: Check for 'Bandwidth' setting changes: new_bandwidth='%d' vs config.bandwidth='%d'",
-		obs_source_name, new_bandwidth, s->config.bandwidth);
-	s->config.bandwidth = new_bandwidth;
+		"'%s' omt_source_update: Check for 'Quality' setting changes: new_quality='%d' vs config.quality='%d'",
+		obs_source_name, new_quality, s->config.quality);
+	s->config.quality = new_quality;
 
-	auto new_latency = (int)obs_data_get_int(settings, PROP_LATENCY);
-	reset_omt_receiver |= (s->config.latency != new_latency);
+	auto new_colorspace = (int)obs_data_get_int(settings, PROP_COLOR_SPACE);
+	reset_omt_receiver |= (s->config.color_space != new_colorspace);
 	obs_log(LOG_DEBUG,
-		"'%s' omt_source_update: Check for 'Latency' setting changes: new_latency='%d' vs config.latency='%d'",
-		obs_source_name, new_latency, s->config.latency);
-	s->config.latency = new_latency;
+		"'%s' omt_source_update: Check for 'Colorspace' setting changes: new_colorspace='%d' vs config.color_space='%d'",
+		obs_source_name, new_colorspace, s->config.color_space);
+	s->config.color_space = new_colorspace;
 
-	auto new_yuv_range = prop_to_range_type((int)obs_data_get_int(settings, PROP_YUV_RANGE));
-	reset_omt_receiver |= (s->config.yuv_range != new_yuv_range);
+	auto new_preview = obs_data_get_bool(settings, PROP_PREVIEW);
+	reset_omt_receiver |= (s->config.preview != new_preview);
 	obs_log(LOG_DEBUG,
-		"'%s' omt_source_update: Check for 'YUV Range' setting changes: new_yuv_range='%d' vs config.yuv_range='%d'",
-		obs_source_name, new_yuv_range, s->config.yuv_range);
-	s->config.yuv_range = new_yuv_range;
-
-	auto new_yuv_colorspace = prop_to_colorspace((int)obs_data_get_int(settings, PROP_YUV_COLORSPACE));
-	reset_omt_receiver |= (s->config.yuv_colorspace != new_yuv_colorspace);
-	obs_log(LOG_DEBUG,
-		"'%s' omt_source_update: Check for 'YUV Colorspace' setting changes: new_yuv_colorspace='%d' vs config.yuv_colorspace='%d'",
-		obs_source_name, new_yuv_colorspace, s->config.yuv_colorspace);
-	s->config.yuv_colorspace = new_yuv_colorspace;
+		"'%s' omt_source_update: Check for 'Preview' setting changes: new_preview='%d' vs config.preview='%d'",
+		obs_source_name, new_preview, s->config.preview);
+	s->config.preview = new_preview;
 
 	//
 	// reset_omt_receiver: END
@@ -697,9 +660,8 @@ void omt_source_update(void *data, obs_data_t *settings)
 	s->config.timeout_action = obs_data_get_int(settings, PROP_TIMEOUT);
 
 	// Clean the source content when settings change unless requested otherwise.
-	// Always clean if the source is set to Audio Only.
 	// Always clean if the receiver is reset as well.
-	if (s->config.bandwidth == PROP_BW_AUDIO_ONLY || s->config.behavior == PROP_BEHAVIOR_STOP_RESUME_BLANK ||
+	if (s->config.behavior == PROP_BEHAVIOR_STOP_RESUME_BLANK ||
 	    reset_omt_receiver) {
 		obs_log(LOG_DEBUG,
 			"'%s' omt_source_update: Deactivate source output video (Actively reset the frame content)",
@@ -710,12 +672,6 @@ void omt_source_update(void *data, obs_data_t *settings)
 	//
 	// Source visibility settings update END
 	//
-	// Disable OBS buffering only for "Lowest" latency mode
-	const bool is_unbuffered = (s->config.latency == PROP_LATENCY_LOWEST);
-	obs_source_set_async_unbuffered(obs_source, is_unbuffered);
-
-	s->config.audio_enabled = obs_data_get_bool(settings, PROP_AUDIO);
-	obs_source_set_audio_active(obs_source, s->config.audio_enabled);
 
 	// Update tally status
 	auto config = Config::Current();
