@@ -156,7 +156,7 @@ static OMTQuality prop_to_quality(int index)
 	case PROP_QUALITY_MEDIUM:
 		return OMTQuality_Medium;
 	case PROP_QUALITY_LOW:
-		return OMTQuality_High;
+		return OMTQuality_Low;
 	case PROP_QUALITY_DEFAULT:
 	default:
 		return OMTQuality_Default;
@@ -335,11 +335,19 @@ void *omt_source_thread(void *data)
 			// Update recv_desc
 			//
 			recv_desc.frameTypes = (OMTFrameType)(OMTFrameType_Audio | OMTFrameType_Video);
-			
-			video_format_get_parameters(prop_to_colorspace(s->config.color_space), 
-				VIDEO_RANGE_PARTIAL,
-				obs_video_frame.color_matrix, obs_video_frame.color_range_min,
-				obs_video_frame.color_range_max);
+
+			if (s->config.preview) {
+				recv_desc.flags = (OMTReceiveFlags_Preview);
+			} else {
+				recv_desc.flags = (OMTReceiveFlags_None);
+			}
+
+			//
+			// Update obs_video_frame
+			//
+			video_format_get_parameters(prop_to_colorspace(s->config.color_space), VIDEO_RANGE_PARTIAL,
+						obs_video_frame.color_matrix, obs_video_frame.color_range_min,
+						obs_video_frame.color_range_max);
 
 			obs_video_frame.trc = prop_to_frame_trc(s->config.color_space);
 
@@ -369,11 +377,7 @@ void *omt_source_thread(void *data)
 			omt_receiver = omt_receive_create(recv_desc.p_omt_source_name, recv_desc.frameTypes,
 							  recv_desc.video_format, recv_desc.flags);
 			omt_receive_setsuggestedquality(omt_receiver, prop_to_quality(s->config.quality));
-			if (s->config.preview) {
-				recv_desc.flags = (OMTReceiveFlags_Preview);
-			} else {
-				recv_desc.flags = (OMTReceiveFlags_None);
-			}
+
 			obs_log(LOG_DEBUG,
 				"'%s' omt_source_thread: reset_omt_receiver: -omt_receiver = omtLib->recv_create_v3(&recv_desc)",
 				obs_source_name);
@@ -386,6 +390,7 @@ void *omt_source_thread(void *data)
 				break;
 			}
 		}
+
 		//
 		// reset_omt_receiver: END
 		//
