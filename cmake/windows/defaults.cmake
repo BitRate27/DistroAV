@@ -6,7 +6,6 @@ include_guard(GLOBAL)
 set(CMAKE_FIND_PACKAGE_TARGETS_GLOBAL TRUE)
 
 include(buildspec)
-include(omtlink)
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(
     CMAKE_INSTALL_PREFIX

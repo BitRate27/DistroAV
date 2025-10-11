@@ -6,10 +6,11 @@ project(${_name} VERSION ${_version})
 
 option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" ON)
 option(ENABLE_QT "Use Qt functionality" ON)
-include(omt)
+
 include(compilerconfig)
 include(defaults)
 include(helpers)
+include(omt)
 
 add_library(${CMAKE_PROJECT_NAME} MODULE)
 
@@ -22,7 +23,12 @@ if(ENABLE_FRONTEND_API)
   find_package(obs-frontend-api REQUIRED)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::obs-frontend-api)
 endif()
-
+# Include platform-specific omt link helper
+if(WIN32)
+  include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/omtlink.cmake")
+elseif(APPLE)
+  include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/omtlink.cmake")
+endif()
 if(ENABLE_QT)
   find_package(Qt6 COMPONENTS Widgets Core Network)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets Qt6::Network)
