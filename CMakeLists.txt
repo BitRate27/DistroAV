@@ -6,7 +6,7 @@ project(${_name} VERSION ${_version})
 
 option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" ON)
 option(ENABLE_QT "Use Qt functionality" ON)
-
+include(omt)
 include(compilerconfig)
 include(defaults)
 include(helpers)
@@ -35,8 +35,6 @@ if(ENABLE_QT)
     PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON
   )
 endif()
-
-include(omt)
 
 target_sources(
   ${CMAKE_PROJECT_NAME}
