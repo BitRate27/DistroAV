@@ -13,7 +13,7 @@ if(NOT CODESIGN_TEAM)
 endif()
 
 include(xcode)
-
+include(omtlink)
 include(buildspec)
 
 # Use Applications directory as default install destination
