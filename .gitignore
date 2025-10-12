@@ -42,5 +42,4 @@ scratch/
 # Except specific project files (DistroAV)
 !/CI
 !/lib/ndi
-!/lib/omt/libomt.h
 !/tools
