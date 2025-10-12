@@ -170,7 +170,7 @@ const char *omt_source_getname(void *)
 
 obs_properties_t *omt_source_getproperties(void *data)
 {
-	auto s = (omt_source_t *)data;
+	// auto s = (omt_source_t *)data;
 	obs_log(LOG_DEBUG, "+omt_source_getproperties(…)");
 
 	obs_properties_t *props = obs_properties_create();
@@ -225,7 +225,7 @@ obs_properties_t *omt_source_getproperties(void *data)
 		obs_property_list_add_int(colorspace_list, "BT2100_HLG_P010", PROP_CS_2100_HLG_P010);
 		obs_property_list_add_int(colorspace_list, "BT2100_PQ_P010", PROP_CS_2100_PQ_P010);
 	}
-	auto preview = obs_properties_add_bool(props, PROP_PREVIEW, "Preview Mode");
+	obs_properties_add_bool(props, PROP_PREVIEW, "Preview Mode");
 
 	obs_log(LOG_DEBUG, "-omt_source_getproperties(…)");
 
@@ -306,8 +306,6 @@ void *omt_source_thread(void *data)
 
 	omt_receive_t *omt_receiver = nullptr;
 	OMTMediaFrame *frame_received = nullptr;
-	int64_t timestamp_audio = 0;
-	int64_t timestamp_video = 0;
 
 	//
 	// Main OMT receiver loop: BEGIN
@@ -507,8 +505,6 @@ void omt_source_thread_process_video2(omt_source_t *source, OMTMediaFrame *omt_v
 			omt_video_frame->Codec);
 		break;
 	}
-
-	auto config = &source->config;
 
 	obs_video_frame->timestamp = (uint64_t)(omt_video_frame->Timestamp);
 
