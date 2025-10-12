@@ -168,7 +168,7 @@ const char *omt_source_getname(void *)
 	return obs_module_text("NDIPlugin.OMTSourceName");
 }
 
-obs_properties_t *omt_source_getproperties(void *data)
+obs_properties_t *omt_source_getproperties(void *)
 {
 	// auto s = (omt_source_t *)data;
 	obs_log(LOG_DEBUG, "+omt_source_getproperties(…)");
