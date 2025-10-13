@@ -75,4 +75,20 @@ else()
   set(ENABLE_COMPILER_TRACE OFF CACHE STRING "Enable Clang time-trace (required Clang and Ninja)" FORCE)
 endif()
 
+# Example: header-only SIMDe via FetchContent
+include(FetchContent)
+FetchContent_Declare(
+  simde
+  GIT_REPOSITORY https://github.com/simd-everywhere/simde.git
+  GIT_TAG        master
+)
+FetchContent_MakeAvailable(simde)
+# If simde is header-only, expose its include dir
+if(TARGET simde) # if the repo provides a target
+  target_link_libraries(obs_deps INTERFACE simde)
+else()
+  target_include_directories(obs_deps INTERFACE ${simde_SOURCE_DIR})
+endif()
+target_compile_definitions(obs_deps INTERFACE SIMDE_ENABLE_OPENMP)
+
 add_compile_definitions($<$<CONFIG:DEBUG>:DEBUG> $<$<CONFIG:DEBUG>:_DEBUG> SIMDE_ENABLE_OPENMP)
