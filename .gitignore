@@ -27,7 +27,7 @@
 .CMakeBuildNumber
 *.code-workspace
 .deps/
-lib/omt/
+lib/omt/libomt
 build_macos/
 build_x64/
 certs/

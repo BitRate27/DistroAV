@@ -1,0 +1,3 @@
+[submodule "lib/omt/libomt"]
+	path = lib/omt/libomt
+	url = https://github.com/BitRate27/libomt.git
