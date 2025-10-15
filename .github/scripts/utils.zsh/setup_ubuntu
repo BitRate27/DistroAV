@@ -39,10 +39,18 @@ if (( ! (${skips[(Ie)all]} + ${skips[(Ie)deps]}) )) {
   sudo apt update
 
   sudo apt-get install ${apt_args} \
+    libsimde-dev \
     build-essential \
     libgles2-mesa-dev \
     libcurl4-openssl-dev \
     obs-studio
+
+  local omt_root=${project_root}/lib/omt
+
+  if [[ -f ${project_root}/lib/omt/libomt/build/buildlinuxx64.sh]] {
+    log_group 'Building libomt...'
+    zsh ${omt_root}/libomt/build/buildlinuxx64.sh
+  }
 
   local -a _qt_packages=()
 
