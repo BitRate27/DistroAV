@@ -45,12 +45,25 @@ if (( ! (${skips[(Ie)all]} + ${skips[(Ie)deps]}) )) {
     libcurl4-openssl-dev \
     obs-studio
 
+  sudo snap install dotnet --classic
+  if (( $? != 0 )) {
+    log_error "Failed to install dotnet from snap."
+    return 1
+  }
   local omt_root=${project_root}/lib/omt
 
-  if [[ -f ${project_root}/lib/omt/libomt/build/buildlinuxx64.sh]] {
-    log_group 'Building libomt...'
-    zsh ${omt_root}/libomt/build/buildlinuxx64.sh
-  }
+  if [[ -f "${project_root}/lib/omt/libomt/build/buildlinuxx64.sh" ]]; then
+    log_group "Building libomtnet..."
+    pushd "${omt_root}/libomtnet/build"
+    zsh "buildall.sh"
+    popd
+    log_group "Building libomt..."
+    pushd "${omt_root}/libomt/build"
+    zsh "buildlinuxx64.sh"
+    popd
+    mkdir -p "${omt_root}/Libraries/linuxx64"
+    cp -v "${omt_root}/libomt/bin/Release/net8.0/linux-x64/native/libomt.so" "${omt_root}/Libraries/linuxx64"
+  fi
 
   local -a _qt_packages=()
 

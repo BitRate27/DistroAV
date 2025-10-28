@@ -27,7 +27,6 @@
 .CMakeBuildNumber
 *.code-workspace
 .deps/
-lib/omt/libomt
 build_macos/
 build_x64/
 certs/
@@ -41,5 +40,7 @@ scratch/
 
 # Except specific project files (DistroAV)
 !/CI
-!/lib/ndi
+!lib/ndi
+!lib/omt/libomt
+!lib/omt/libomtnet 
 !/tools
