@@ -43,6 +43,7 @@ if (( ! (${skips[(Ie)all]} + ${skips[(Ie)deps]}) )) {
     build-essential \
     libgles2-mesa-dev \
     libcurl4-openssl-dev \
+    clang++ \
     obs-studio
 
   sudo snap install dotnet --classic
@@ -59,6 +60,10 @@ if (( ! (${skips[(Ie)all]} + ${skips[(Ie)deps]}) )) {
     popd
     log_group "Building libomt..."
     pushd "${omt_root}/libomt/build"
+    zsh "buildlinuxx64.sh"
+    popd
+    log_group "Building libvmx..."
+    pushd "${omt_root}/libvmx/build"
     zsh "buildlinuxx64.sh"
     popd
     mkdir -p "${omt_root}/Libraries/linuxx64"

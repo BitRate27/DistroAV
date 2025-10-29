@@ -4,3 +4,6 @@
 [submodule "lib/omt/libomtnet"]
 	path = lib/omt/libomtnet
 	url = https://github.com/openmediatransport/libomtnet.git
+[submodule "lib/omt/libvmx"]
+	path = lib/omt/libvmx
+	url = https://github.com/BitRate27/libvmx.git

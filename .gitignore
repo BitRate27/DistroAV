@@ -42,5 +42,6 @@ scratch/
 !/CI
 !lib/ndi
 !lib/omt/libomt
-!lib/omt/libomtnet 
+!lib/omt/libomtnet
+!lib/omt/libvmx
 !/tools
