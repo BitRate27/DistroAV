@@ -52,6 +52,7 @@ typedef struct {
 
 	uint8_t *audio_conv_buffer;
 	size_t audio_conv_buffer_size;
+	int8_t no_connections;
 } ndi_filter_t;
 
 const char *ndi_filter_getname(void *)
@@ -114,7 +115,7 @@ bool is_filter_valid(ndi_filter_t *filter)
 
 	// Valid if parent width/height are nonzero, source is enabled, and parent is active
 	bool is_valid = (width != 0) && (height != 0) && obs_source_enabled(filter->obs_source) &&
-			obs_source_active(parent);
+			obs_source_showing(parent);
 
 	return is_valid;
 }
@@ -122,6 +123,25 @@ bool is_filter_valid(ndi_filter_t *filter)
 void ndi_filter_raw_video(void *data, video_data *frame)
 {
 	auto f = (ndi_filter_t *)data;
+
+	pthread_mutex_lock(&f->ndi_sender_video_mutex);
+
+	if (!f->ndi_sender) {
+		pthread_mutex_unlock(&f->ndi_sender_video_mutex);
+		return;
+	}	
+
+	int nc = ndiLib->send_get_no_connections(f->ndi_sender, 10);
+	if (nc != f->no_connections) {
+		auto ndi_source = ndiLib->send_get_source_name(f->ndi_sender);
+		obs_log(LOG_INFO, "Dedicated NDI Output video sender status: ndi_name='%s', connections=%d)",
+			ndi_source->p_ndi_name, nc);
+		f->no_connections = nc;
+	}
+	pthread_mutex_unlock(&f->ndi_sender_video_mutex);
+
+	if (f->no_connections <= 0)
+		return;
 
 	NDIlib_video_frame_v2_t video_frame = {0};
 
@@ -259,9 +279,13 @@ void ndi_sender_create(ndi_filter_t *filter, obs_data_t *settings)
 		settings = obs_source_get_settings(obs_source);
 	}
 
-	NDIlib_send_create_t send_desc;
-	send_desc.p_ndi_name = obs_data_get_string(settings, FLT_PROP_NAME);
+	auto name = obs_data_get_string(settings, FLT_PROP_NAME);
 	auto groups = obs_data_get_string(settings, FLT_PROP_GROUPS);
+
+	NDIlib_send_create_t send_desc;
+
+	send_desc.p_ndi_name = name;
+
 	if (groups && groups[0])
 		send_desc.p_groups = groups;
 	else
@@ -276,7 +300,17 @@ void ndi_sender_create(ndi_filter_t *filter, obs_data_t *settings)
 	pthread_mutex_lock(&filter->ndi_sender_audio_mutex);
 	ndiLib->send_destroy(filter->ndi_sender);
 	filter->ndi_sender = ndiLib->send_create(&send_desc);
+
+	if (filter->ndi_sender) {
+		obs_log(LOG_INFO, "Dedicated NDI Output sender created: '%s'", name);
+		obs_log(LOG_DEBUG, "'%s' ndi_sender_create: ndi output started", name);
+	} else {
+		obs_log(LOG_WARNING, "WARN-416 - Dedicated NDI Output sender initialisation failed. '%s'", name);
+		obs_log(LOG_DEBUG, "'%s' ndi_sender_create: ndi sender init failed", name);
+	}
+
 	pthread_mutex_unlock(&filter->ndi_sender_audio_mutex);
+	filter->no_connections = -1;
 
 	if (!filter->is_audioonly) {
 		pthread_mutex_unlock(&filter->ndi_sender_video_mutex);
@@ -400,7 +434,7 @@ void ndi_filter_tick(void *data, float)
 		return;
 	} else if (!f->ndi_sender) {
 		// If the sender is null then recreate it
-		ndi_sender_create(f, nullptr);
+		//ndi_sender_create(f, nullptr);
 	}
 }
 
@@ -409,6 +443,25 @@ obs_audio_data *ndi_filter_asyncaudio(void *data, obs_audio_data *audio_data)
 	// NOTE: The logic in this function should be similar to
 	// ndi-output.cpp/ndi_output_raw_audio(...)
 	auto f = (ndi_filter_t *)data;
+
+	pthread_mutex_lock(&f->ndi_sender_audio_mutex);
+
+	if (!f->ndi_sender) {
+		pthread_mutex_unlock(&f->ndi_sender_audio_mutex);
+		return audio_data;
+	}	
+	
+	int nc = ndiLib->send_get_no_connections(f->ndi_sender, 10);
+	if (nc != f->no_connections) {
+		auto ndi_source = ndiLib->send_get_source_name(f->ndi_sender);
+		obs_log(LOG_INFO, "Dedicated NDI Output audio sender status: ndi_name='%s', connections=%d)",
+			ndi_source->p_ndi_name, nc);
+		f->no_connections = nc;
+	}
+	pthread_mutex_unlock(&f->ndi_sender_audio_mutex);
+
+	if (f->no_connections <= 0)
+		return audio_data;
 
 	obs_get_audio_info(&f->oai);
 
