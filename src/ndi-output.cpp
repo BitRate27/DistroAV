@@ -17,7 +17,7 @@
 
 #include "plugin-main.h"
 #include <util/threading.h>
- 
+
 // #include "plugin-support.h"
 
 static FORCE_INLINE uint32_t min_uint32(uint32_t a, uint32_t b)
@@ -329,14 +329,13 @@ void ndi_output_rawvideo(void *data, video_data *frame)
 	if (!o->ndi_sender) {
 		pthread_mutex_unlock(&o->ndi_sender_mutex);
 		return;
-	}	
+	}
 
 	int nc = ndiLib->send_get_no_connections(o->ndi_sender, 10);
 
 	if (nc != o->no_connections) {
 		auto ndi_source = ndiLib->send_get_source_name(o->ndi_sender);
-		obs_log(LOG_INFO,
-			"NDI Output video sender status: ndi_name='%s', connections=%d)",
+		obs_log(LOG_INFO, "NDI Output video sender status: ndi_name='%s', connections=%d)",
 			ndi_source->p_ndi_name, nc);
 		o->no_connections = nc;
 	}
