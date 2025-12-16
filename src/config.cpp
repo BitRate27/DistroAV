@@ -35,6 +35,7 @@
 #define PARAM_TALLY_PROGRAM_ENABLED "TallyProgramEnabled"
 #define PARAM_TALLY_PREVIEW_ENABLED "TallyPreviewEnabled"
 #define PARAM_SKIP_UPDATE_VERSION "SkipUpdateVersion"
+#define PARAM_IP_SEARCH_LIST "IPSearchList"
 
 // App Settings
 #define PARAM_AUTO_CHECK_FOR_UPDATES "AutoCheckForUpdates"
@@ -60,7 +61,8 @@ std::map<std::string, enum ObsConfigType> ConfigTypeMap {
 	{PARAM_PREVIEW_OUTPUT_GROUPS, OBS_CONFIG_STRING},
 	{PARAM_TALLY_PROGRAM_ENABLED, OBS_CONFIG_BOOL},
 	{PARAM_TALLY_PREVIEW_ENABLED, OBS_CONFIG_BOOL},
-	{PARAM_SKIP_UPDATE_VERSION, OBS_CONFIG_STRING}
+	{PARAM_SKIP_UPDATE_VERSION, OBS_CONFIG_STRING},
+	{PARAM_IP_SEARCH_LIST, OBS_CONFIG_STRING}
 };
 
 void ProcessCommandLine()
@@ -191,7 +193,8 @@ Config::Config()
 	  PreviewOutputName("OBS Preview"),
 	  PreviewOutputGroups(""),
 	  TallyProgramEnabled(true),
-	  TallyPreviewEnabled(true)
+	  TallyPreviewEnabled(true),
+	  IPSearchList("")
 {
 	ProcessCommandLine();
 	SetDefaultsToUserStore();
@@ -215,6 +218,7 @@ void Config::SetDefaultsToUserStore()
 
 		config_set_default_bool(obs_config, SECTION_NAME, PARAM_TALLY_PROGRAM_ENABLED, TallyProgramEnabled);
 		config_set_default_bool(obs_config, SECTION_NAME, PARAM_TALLY_PREVIEW_ENABLED, TallyPreviewEnabled);
+		config_set_default_string(obs_config, SECTION_NAME, PARAM_IP_SEARCH_LIST, QT_TO_UTF8(IPSearchList));
 	}
 }
 
@@ -236,6 +240,7 @@ void Config::GlobalToUserMigration()
 		MigrateSetting(app_config, user_config, SECTION_NAME, PARAM_TALLY_PREVIEW_ENABLED);
 
 		MigrateSetting(app_config, user_config, SECTION_NAME, PARAM_SKIP_UPDATE_VERSION);
+		MigrateSetting(app_config, user_config, SECTION_NAME, PARAM_IP_SEARCH_LIST);
 
 		config_save(app_config);
 		config_save(user_config);
@@ -256,6 +261,8 @@ void Config::Load()
 
 		TallyProgramEnabled = config_get_bool(obs_config, SECTION_NAME, PARAM_TALLY_PROGRAM_ENABLED);
 		TallyPreviewEnabled = config_get_bool(obs_config, SECTION_NAME, PARAM_TALLY_PREVIEW_ENABLED);
+
+		IPSearchList = config_get_string(obs_config, SECTION_NAME, PARAM_IP_SEARCH_LIST);
 	}
 }
 
@@ -274,6 +281,8 @@ void Config::Save()
 
 		config_set_bool(obs_config, SECTION_NAME, PARAM_TALLY_PROGRAM_ENABLED, TallyProgramEnabled);
 		config_set_bool(obs_config, SECTION_NAME, PARAM_TALLY_PREVIEW_ENABLED, TallyPreviewEnabled);
+
+		config_set_string(obs_config, SECTION_NAME, PARAM_IP_SEARCH_LIST, QT_TO_UTF8(IPSearchList));
 
 		config_save(obs_config);
 	}

@@ -97,7 +97,7 @@ If you are running a local build, don't forget to add your build info to the upd
 				}
 
 				QMessageBox::warning(this, Str("NDIPlugin.Update.CheckingForUpdate.Error.Title"),
-						     errorText);
+							 errorText);
 				return false;
 			}
 
@@ -159,6 +159,8 @@ void OutputSettings::onFormAccepted()
 	config->TallyProgramEnabled = ui->tallyProgramCheckBox->isChecked();
 	config->TallyPreviewEnabled = ui->tallyPreviewCheckBox->isChecked();
 
+	config->IPSearchList = ui->ipSearchList->text();
+
 	config->AutoCheckForUpdates(ui->checkBoxAutoCheckForUpdates->isChecked());
 
 	auto mainSupported = ui->mainOutputGroupBox->isEnabled();
@@ -176,8 +178,8 @@ void OutputSettings::onFormAccepted()
 
 	if (mainSupported && config->OutputEnabled && !config->OutputName.isEmpty()) {
 		if ((last_config.OutputEnabled != config->OutputEnabled) ||
-		    (last_config.OutputName != config->OutputName) ||
-		    (last_config.OutputGroups != config->OutputGroups)) {
+		 (last_config.OutputName != config->OutputName) ||
+		 (last_config.OutputGroups != config->OutputGroups)) {
 			// The Output is supported and enabled, OutputName exists and a Name or GroupName has changed since last form submission
 			obs_log(LOG_INFO, "Initializing Main output");
 			main_output_init();
@@ -187,8 +189,8 @@ void OutputSettings::onFormAccepted()
 	}
 	if (config->PreviewOutputEnabled && !config->PreviewOutputName.isEmpty()) {
 		if ((last_config.PreviewOutputEnabled != config->PreviewOutputEnabled) ||
-		    (last_config.PreviewOutputName != config->PreviewOutputName) ||
-		    (last_config.PreviewOutputGroups != config->PreviewOutputGroups)) {
+		 (last_config.PreviewOutputName != config->PreviewOutputName) ||
+		 (last_config.PreviewOutputGroups != config->PreviewOutputGroups)) {
 			// The Preview Output is enabled, OutputName exists and a Name or GroupName has changed since last form submission
 			obs_log(LOG_INFO, "Initializing Preview output");
 			preview_output_init();
@@ -225,6 +227,8 @@ void OutputSettings::showEvent(QShowEvent *)
 	ui->tallyPreviewCheckBox->setChecked(config->TallyPreviewEnabled);
 
 	ui->checkBoxAutoCheckForUpdates->setChecked(config->AutoCheckForUpdates());
+
+	ui->ipSearchList->setText(config->IPSearchList);
 }
 
 void OutputSettings::toggleShowHide()

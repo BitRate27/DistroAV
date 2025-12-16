@@ -78,6 +78,7 @@ public:
 	QString PreviewOutputGroups;
 	bool TallyProgramEnabled;
 	bool TallyPreviewEnabled;
+    QString IPSearchList;
 
 	QString GetInstallGUID();
 	bool AutoCheckForUpdates();

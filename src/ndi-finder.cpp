@@ -31,6 +31,8 @@ void NDIFinder::refreshNDISourceList(Callback callback)
 void NDIFinder::retrieveNDISourceList()
 {
 	NDIlib_find_create_t find_desc = {0};
+	auto current_config = Config::Current();
+	find_desc.p_extra_ips = bstrdup(QT_TO_UTF8(current_config->IPSearchList));
 	find_desc.show_local_sources = true;
 	find_desc.p_groups = NULL;
 	NDIlib_find_instance_t ndi_find = ndiLib->find_create_v2(&find_desc);
@@ -59,4 +61,5 @@ void NDIFinder::retrieveNDISourceList()
 	}
 
 	ndiLib->find_destroy(ndi_find);
+	bfree(const_cast<char*>(find_desc.p_extra_ips));
 }
