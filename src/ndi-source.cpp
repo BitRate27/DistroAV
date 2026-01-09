@@ -20,7 +20,7 @@
 
 #include <util/platform.h>
 #include <util/threading.h>
-
+#include "obs-support/sync-debug.h"
 #include <QDesktopServices>
 #include <QUrl>
 
@@ -752,17 +752,37 @@ void ndi_source_thread_process_audio3(ndi_source_config_t *config, NDIlib_audio_
 		return;
 	}
 
+	obs_sync_debug_log("NDI -> ndi_source_thread_process_audio2",
+			   obs_source_get_name(obs_source),
+			   ndi_audio_frame->timecode,
+			   ndi_audio_frame->timestamp);
+	OBS_SYNC_DEBUG_LOG_AUDIO_TIME(
+		"NDI -> ndi_source_thread", obs_source_get_name(obs_source),
+		ndi_audio_frame->timestamp, ndi_audio_frame->p_data,
+		ndi_audio_frame->no_samples, ndi_audio_frame->sample_rate);
 	const int channelCount = ndi_audio_frame->no_channels > 8 ? 8 : ndi_audio_frame->no_channels;
 
 	obs_audio_frame->speakers = channel_count_to_layout(channelCount);
 
 	switch (config->sync_mode) {
 	case PROP_SYNC_NDI_TIMESTAMP:
+<<<<<<< Updated upstream
 		obs_audio_frame->timestamp = (uint64_t)(ndi_audio_frame->timestamp * 100);
 		break;
 
 	case PROP_SYNC_NDI_SOURCE_TIMECODE:
 		obs_audio_frame->timestamp = (uint64_t)(ndi_audio_frame->timecode * 100);
+=======
+		// Translate NDI timestamp to OBS time domain (fixes issue #1386)
+		obs_audio_frame->timestamp = translate_ndi_to_obs_time(source, ndi_audio_frame->timestamp, false);
+		//obs_audio_frame->timestamp = ndi_audio_frame->timestamp * 100; // Convert to nanoseconds
+		break;
+
+	case PROP_SYNC_NDI_SOURCE_TIMECODE:
+		// Translate NDI timecode to OBS time domain (fixes issue #1386)
+		obs_audio_frame->timestamp = translate_ndi_to_obs_time(source, ndi_audio_frame->timecode, true);
+		//obs_audio_frame->timestamp = ndi_audio_frame->timecode * 100; // Convert to nanoseconds 
+>>>>>>> Stashed changes
 		break;
 	}
 
@@ -774,12 +794,27 @@ void ndi_source_thread_process_audio3(ndi_source_config_t *config, NDIlib_audio_
 			(uint8_t *)ndi_audio_frame->p_data + (i * ndi_audio_frame->channel_stride_in_bytes);
 	}
 
+	obs_sync_debug_log("OBS <- ndi_source_thread_process_audio2",
+			   obs_source_get_name(obs_source), (int64_t)0,
+			   obs_audio_frame->timestamp);
+	OBS_SYNC_DEBUG_LOG_AUDIO_TIME(
+		"OBS <- ndi_source_thread", obs_source_get_name(obs_source),
+		obs_audio_frame->timestamp, (uint8_t *)obs_audio_frame->data[0],
+		obs_audio_frame->frames, obs_audio_frame->samples_per_sec);
 	obs_source_output_audio(obs_source, obs_audio_frame);
 }
 
 void ndi_source_thread_process_video2(ndi_source_t *source, NDIlib_video_frame_v2_t *ndi_video_frame,
 				      obs_source *obs_source, obs_source_frame *obs_video_frame)
 {
+	obs_sync_debug_log("NDI -> ndi_source_thread_process_video2",
+			   obs_source_get_name(obs_source),
+			   ndi_video_frame->timecode,
+			   ndi_video_frame->timestamp);
+	OBS_SYNC_DEBUG_LOG_VIDEO_TIME("NDI -> ndi_source_thread",
+				      obs_source_get_name(obs_source),
+				      ndi_video_frame->timestamp,
+				      (uint8_t *)ndi_video_frame->p_data);
 	switch (ndi_video_frame->FourCC) {
 	case NDIlib_FourCC_type_BGRA:
 		obs_video_frame->format = VIDEO_FORMAT_BGRA;
@@ -819,7 +854,14 @@ void ndi_source_thread_process_video2(ndi_source_t *source, NDIlib_video_frame_v
 
 	switch (config->sync_mode) {
 	case PROP_SYNC_NDI_TIMESTAMP:
+<<<<<<< Updated upstream
 		obs_video_frame->timestamp = (uint64_t)(ndi_video_frame->timestamp * 100);
+=======
+		// Translate NDI timestamp to OBS time domain (fixes issue #1386)
+		//obs_video_frame->timestamp = translate_ndi_to_obs_time(source, ndi_video_frame->timestamp, false);
+		obs_video_frame->timestamp = translate_ndi_to_obs_time(source, ndi_video_frame->timestamp, false);
+		//obs_audio_frame->timestamp = ndi_audio_frame->timestamp * 100; // Convert to nanoseconds
+>>>>>>> Stashed changes
 		break;
 
 	case PROP_SYNC_NDI_SOURCE_TIMECODE:
@@ -836,6 +878,14 @@ void ndi_source_thread_process_video2(ndi_source_t *source, NDIlib_video_frame_v
 	obs_video_frame->linesize[0] = ndi_video_frame->line_stride_in_bytes;
 	obs_video_frame->data[0] = ndi_video_frame->p_data;
 
+	obs_sync_debug_log("OBS <- ndi_source_thread_process_video2",
+			   obs_source_get_name(obs_source), (int64_t)0,
+			   obs_video_frame->timestamp);
+	OBS_SYNC_DEBUG_LOG_VIDEO_TIME("OBS <- ndi_source_thread",
+				      obs_source_get_name(obs_source),
+				      (int64_t)obs_video_frame->timestamp,
+				      obs_video_frame->data[0]);
+					  
 	obs_source_output_video(obs_source, obs_video_frame);
 }
 
