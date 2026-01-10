@@ -219,7 +219,19 @@ bool ndi_output_start(void *data)
 	send_desc.clock_video = false;
 	send_desc.clock_audio = false;
 
-	o->ndi_sender = ndiLib->send_create(&send_desc);
+	const char *ndi_config_json = R"json(
+    {
+      "ndi": {
+        "codec": {
+          "shq": {
+            "mode": "4:2:2",
+            "quality": 100
+          }
+        }
+      }
+    }
+    )json";
+	o->ndi_sender = ndiLib->send_create_v2(&send_desc, ndi_config_json);
 	if (o->ndi_sender) {
 		o->started = obs_output_begin_data_capture(o->output, flags);
 		if (o->started) {

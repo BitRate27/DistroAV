@@ -23,7 +23,7 @@
 
 #include "obs-support/obs-app.hpp"
 
-#include <Processing.NDI.Lib.h>
+#include <Processing.NDI.Advanced.h>
 
 #define PLUGIN_MIN_QT_VERSION "6.0.0"
 #define PLUGIN_MIN_OBS_VERSION "31.0.0"

@@ -48,7 +48,7 @@
 #				define PROCESSINGNDILIB_API __declspec(dllimport)
 #			endif // __cplusplus
 #			ifdef _WIN64
-#				define NDILIB_LIBRARY_NAME  "Processing.NDI.Lib.x64.dll"
+#				define NDILIB_LIBRARY_NAME  "Processing.NDI.Lib.Advanced.x64.dll"
 #				define NDILIB_REDIST_FOLDER "NDI_RUNTIME_DIR_V6"
 #				define NDILIB_REDIST_URL    "http://ndi.link/NDIRedistV6"
 #			else // _WIN64

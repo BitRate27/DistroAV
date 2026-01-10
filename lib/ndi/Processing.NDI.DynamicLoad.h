@@ -72,7 +72,10 @@ typedef struct NDIlib_v6 {
 		NDIlib_send_instance_t (*send_create)(const NDIlib_send_create_t* p_create_settings);
 		PROCESSINGNDILIB_DEPRECATED NDIlib_send_instance_t (*NDIlib_send_create)(const NDIlib_send_create_t* p_create_settings);
 	};
-
+	union {
+		NDIlib_send_instance_t (*send_create_v2)(const NDIlib_send_create_t* p_create_settings, const char* p_config_data);
+		PROCESSINGNDILIB_DEPRECATED NDIlib_send_instance_t (*NDIlib_send_create_v2)(const NDIlib_send_create_t* p_create_settings, const char* p_config_data);
+	};
 	union {
 		void (*send_destroy)(NDIlib_send_instance_t p_instance);
 		PROCESSINGNDILIB_DEPRECATED void (*NDIlib_send_destroy)(NDIlib_send_instance_t p_instance);
