@@ -114,6 +114,17 @@ typedef struct ndi_source_config_t {
 	NDIlib_tally_t tally;
 } ndi_source_config_t;
 
+// Timestamp synchronization for translating NDI timestamps to OBS time domain
+// This fixes the initialization issue when OBS starts before NDI sources
+// See: https://github.com/DistroAV/DistroAV/issues/1386
+typedef struct ndi_timestamp_sync_t {
+	bool timestamp_initialized;
+	bool timecode_initialized;
+	int64_t base_ndi_timestamp; // First NDI timestamp (100ns units)
+	int64_t base_ndi_timecode;  // First NDI timecode (100ns units)
+	uint64_t base_obs_time;     // OBS system time at first frame
+} ndi_timestamp_sync_t;
+
 typedef struct ndi_source_t {
 	obs_source_t *obs_source;
 	ndi_source_config_t config;
@@ -123,6 +134,9 @@ typedef struct ndi_source_t {
 
 	uint32_t width;
 	uint32_t height;
+
+	// Timestamp synchronization for network timing mode
+	ndi_timestamp_sync_t ts_sync;
 
 	uint64_t last_frame_timestamp;
 } ndi_source_t;
@@ -204,6 +218,58 @@ static video_range_type prop_to_range_type(int index)
 	case PROP_YUV_RANGE_PARTIAL:
 		return VIDEO_RANGE_PARTIAL;
 	}
+}
+
+// Reset timestamp synchronization (called when receiver is reset)
+static void reset_timestamp_sync(ndi_source_t *source)
+{
+	source->ts_sync.timestamp_initialized = false;
+	source->ts_sync.timecode_initialized = false;
+	source->ts_sync.base_ndi_timestamp = 0;
+	source->ts_sync.base_ndi_timecode = 0;
+	source->ts_sync.base_obs_time = 0;
+}
+
+// Translate NDI timestamp/timecode to OBS time domain
+// This preserves relative timing while aligning with OBS's clock expectations
+// Fixes: https://github.com/DistroAV/DistroAV/issues/1386
+static uint64_t translate_ndi_to_obs_time(ndi_source_t *source, int64_t ndi_time_100ns, bool is_timecode)
+{
+	ndi_timestamp_sync_t *sync = &source->ts_sync;
+	uint64_t now = os_gettime_ns();
+
+	bool *initialized = is_timecode ? &sync->timecode_initialized : &sync->timestamp_initialized;
+	int64_t *base_ndi = is_timecode ? &sync->base_ndi_timecode : &sync->base_ndi_timestamp;
+
+	if (!*initialized) {
+		// First frame - establish baseline mapping between NDI and OBS time domains
+		*initialized = true;
+		*base_ndi = ndi_time_100ns;
+		sync->base_obs_time = now;
+
+		// IMPORTANT: Reset OBS's internal async frame buffer state
+		// This clears any stale last_frame_ts that accumulated while waiting for NDI source
+		// Without this, OBS's frame timing may be out of sync with our new baseline
+		obs_source_output_video(source->obs_source, NULL);
+
+		obs_log(LOG_INFO,
+			"Timestamp sync initialized: NDI base=%lld (100ns), OBS base=%llu ns - cleared OBS frame buffer",
+			(long long)ndi_time_100ns, (unsigned long long)now);
+
+		return now;
+	}
+
+	// Calculate relative offset from first frame (convert 100ns to nanoseconds)
+	int64_t ndi_offset_100ns = ndi_time_100ns - *base_ndi;
+	int64_t ndi_offset_ns = ndi_offset_100ns * 100;
+
+	// Apply offset to OBS baseline time
+	// Handle potential negative offset (frame arrived before baseline - shouldn't happen but be safe)
+	if (ndi_offset_ns < 0 && (uint64_t)(-ndi_offset_ns) > sync->base_obs_time) {
+		return 0;
+	}
+
+	return sync->base_obs_time + ndi_offset_ns;
 }
 
 const char *ndi_source_getname(void *)
@@ -375,7 +441,7 @@ void process_empty_frame(ndi_source_t *source)
 	}
 }
 
-void ndi_source_thread_process_audio3(ndi_source_config_t *config, NDIlib_audio_frame_v3_t *ndi_audio_frame,
+void ndi_source_thread_process_audio3(ndi_source_t *source, NDIlib_audio_frame_v3_t *ndi_audio_frame,
 				      obs_source_t *obs_source, obs_source_audio *obs_audio_frame);
 
 void ndi_source_thread_process_video2(ndi_source_t *source, NDIlib_video_frame_v2_t *ndi_video_frame,
@@ -495,6 +561,10 @@ void *ndi_source_thread(void *data)
 				ndiLib->recv_destroy(ndi_receiver);
 				ndi_receiver = nullptr;
 			}
+
+			// Reset timestamp synchronization when receiver is reset
+			// This ensures proper time domain translation on next frame
+			reset_timestamp_sync(s);
 
 			obs_log(LOG_DEBUG,
 				"'%s' ndi_source_thread: reset_ndi_receiver: recv_desc = { p_ndi_recv_name='%s', source_to_connect_to.p_ndi_name='%s' }",
@@ -660,7 +730,7 @@ void *ndi_source_thread(void *data)
 			if (audio_frame.p_data && (audio_frame.timestamp > timestamp_audio)) {
 				timestamp_audio = audio_frame.timestamp;
 				// obs_log(LOG_DEBUG, "%s: New Audio Frame (Framesync ON): ts=%d tc=%d", obs_source_name, audio_frame.timestamp, audio_frame.timecode);
-				ndi_source_thread_process_audio3(&s->config, &audio_frame, s->obs_source,
+				ndi_source_thread_process_audio3(s, &audio_frame, s->obs_source,
 								 &obs_audio_frame);
 			}
 			ndiLib->framesync_free_audio_v2(ndi_frame_sync, &audio_frame);
@@ -692,7 +762,7 @@ void *ndi_source_thread(void *data)
 				// AUDIO
 				//
 				// obs_log(LOG_DEBUG, "%s: New Audio Frame (Framesync OFF): ts=%d tc=%d", obs_source_name, audio_frame.timestamp, audio_frame.timecode);
-				ndi_source_thread_process_audio3(&s->config, &audio_frame, s->obs_source,
+				ndi_source_thread_process_audio3(s, &audio_frame, s->obs_source,
 								 &obs_audio_frame);
 
 				ndiLib->recv_free_audio_v3(ndi_receiver, &audio_frame);
@@ -745,44 +815,35 @@ void *ndi_source_thread(void *data)
 	return nullptr;
 }
 
-void ndi_source_thread_process_audio3(ndi_source_config_t *config, NDIlib_audio_frame_v3_t *ndi_audio_frame,
+void ndi_source_thread_process_audio3(ndi_source_t *source, NDIlib_audio_frame_v3_t *ndi_audio_frame,
 				      obs_source_t *obs_source, obs_source_audio *obs_audio_frame)
 {
+	ndi_source_config_t *config = &source->config;
+
 	if (!config->audio_enabled) {
 		return;
 	}
 
-	obs_sync_debug_log("NDI -> ndi_source_thread_process_audio2",
-			   obs_source_get_name(obs_source),
-			   ndi_audio_frame->timecode,
-			   ndi_audio_frame->timestamp);
-	OBS_SYNC_DEBUG_LOG_AUDIO_TIME(
-		"NDI -> ndi_source_thread", obs_source_get_name(obs_source),
-		ndi_audio_frame->timestamp, ndi_audio_frame->p_data,
-		ndi_audio_frame->no_samples, ndi_audio_frame->sample_rate);
+	obs_sync_debug_log("NDI -> ndi_source_thread_process_audio2", obs_source_get_name(obs_source),
+			   ndi_audio_frame->timecode, ndi_audio_frame->timestamp);
+	OBS_SYNC_DEBUG_LOG_AUDIO_TIME("NDI -> ndi_source_thread", obs_source_get_name(obs_source),
+				      ndi_audio_frame->timestamp, ndi_audio_frame->p_data, ndi_audio_frame->no_samples,
+				      ndi_audio_frame->sample_rate);
 	const int channelCount = ndi_audio_frame->no_channels > 8 ? 8 : ndi_audio_frame->no_channels;
 
 	obs_audio_frame->speakers = channel_count_to_layout(channelCount);
 
 	switch (config->sync_mode) {
 	case PROP_SYNC_NDI_TIMESTAMP:
-<<<<<<< Updated upstream
-		obs_audio_frame->timestamp = (uint64_t)(ndi_audio_frame->timestamp * 100);
-		break;
-
-	case PROP_SYNC_NDI_SOURCE_TIMECODE:
-		obs_audio_frame->timestamp = (uint64_t)(ndi_audio_frame->timecode * 100);
-=======
 		// Translate NDI timestamp to OBS time domain (fixes issue #1386)
-		obs_audio_frame->timestamp = translate_ndi_to_obs_time(source, ndi_audio_frame->timestamp, false);
-		//obs_audio_frame->timestamp = ndi_audio_frame->timestamp * 100; // Convert to nanoseconds
+		//obs_audio_frame->timestamp = translate_ndi_to_obs_time(source, ndi_audio_frame->timestamp, false);
+		obs_audio_frame->timestamp = ndi_audio_frame->timestamp * 100; // Convert to nanoseconds
 		break;
 
 	case PROP_SYNC_NDI_SOURCE_TIMECODE:
 		// Translate NDI timecode to OBS time domain (fixes issue #1386)
 		obs_audio_frame->timestamp = translate_ndi_to_obs_time(source, ndi_audio_frame->timecode, true);
-		//obs_audio_frame->timestamp = ndi_audio_frame->timecode * 100; // Convert to nanoseconds 
->>>>>>> Stashed changes
+		//obs_audio_frame->timestamp = ndi_audio_frame->timecode * 100; // Convert to nanoseconds
 		break;
 	}
 
@@ -794,27 +855,21 @@ void ndi_source_thread_process_audio3(ndi_source_config_t *config, NDIlib_audio_
 			(uint8_t *)ndi_audio_frame->p_data + (i * ndi_audio_frame->channel_stride_in_bytes);
 	}
 
-	obs_sync_debug_log("OBS <- ndi_source_thread_process_audio2",
-			   obs_source_get_name(obs_source), (int64_t)0,
+	obs_sync_debug_log("OBS <- ndi_source_thread_process_audio2", obs_source_get_name(obs_source), (int64_t)0,
 			   obs_audio_frame->timestamp);
-	OBS_SYNC_DEBUG_LOG_AUDIO_TIME(
-		"OBS <- ndi_source_thread", obs_source_get_name(obs_source),
-		obs_audio_frame->timestamp, (uint8_t *)obs_audio_frame->data[0],
-		obs_audio_frame->frames, obs_audio_frame->samples_per_sec);
+	OBS_SYNC_DEBUG_LOG_AUDIO_TIME("OBS <- ndi_source_thread", obs_source_get_name(obs_source),
+				      obs_audio_frame->timestamp, (uint8_t *)obs_audio_frame->data[0],
+				      obs_audio_frame->frames, obs_audio_frame->samples_per_sec);
 	obs_source_output_audio(obs_source, obs_audio_frame);
 }
 
 void ndi_source_thread_process_video2(ndi_source_t *source, NDIlib_video_frame_v2_t *ndi_video_frame,
 				      obs_source *obs_source, obs_source_frame *obs_video_frame)
 {
-	obs_sync_debug_log("NDI -> ndi_source_thread_process_video2",
-			   obs_source_get_name(obs_source),
-			   ndi_video_frame->timecode,
-			   ndi_video_frame->timestamp);
-	OBS_SYNC_DEBUG_LOG_VIDEO_TIME("NDI -> ndi_source_thread",
-				      obs_source_get_name(obs_source),
-				      ndi_video_frame->timestamp,
-				      (uint8_t *)ndi_video_frame->p_data);
+	obs_sync_debug_log("NDI -> ndi_source_thread_process_video2", obs_source_get_name(obs_source),
+			   ndi_video_frame->timecode, ndi_video_frame->timestamp);
+	OBS_SYNC_DEBUG_LOG_VIDEO_TIME("NDI -> ndi_source_thread", obs_source_get_name(obs_source),
+				      ndi_video_frame->timestamp, (uint8_t *)ndi_video_frame->p_data);
 	switch (ndi_video_frame->FourCC) {
 	case NDIlib_FourCC_type_BGRA:
 		obs_video_frame->format = VIDEO_FORMAT_BGRA;
@@ -854,18 +909,15 @@ void ndi_source_thread_process_video2(ndi_source_t *source, NDIlib_video_frame_v
 
 	switch (config->sync_mode) {
 	case PROP_SYNC_NDI_TIMESTAMP:
-<<<<<<< Updated upstream
-		obs_video_frame->timestamp = (uint64_t)(ndi_video_frame->timestamp * 100);
-=======
 		// Translate NDI timestamp to OBS time domain (fixes issue #1386)
 		//obs_video_frame->timestamp = translate_ndi_to_obs_time(source, ndi_video_frame->timestamp, false);
 		obs_video_frame->timestamp = translate_ndi_to_obs_time(source, ndi_video_frame->timestamp, false);
 		//obs_audio_frame->timestamp = ndi_audio_frame->timestamp * 100; // Convert to nanoseconds
->>>>>>> Stashed changes
 		break;
 
 	case PROP_SYNC_NDI_SOURCE_TIMECODE:
-		obs_video_frame->timestamp = (uint64_t)(ndi_video_frame->timecode * 100);
+		obs_video_frame->timestamp = translate_ndi_to_obs_time(source, ndi_video_frame->timecode, true);
+		//obs_video_frame->timestamp = (uint64_t)(ndi_video_frame->timecode * 100);
 		break;
 	}
 
@@ -878,14 +930,11 @@ void ndi_source_thread_process_video2(ndi_source_t *source, NDIlib_video_frame_v
 	obs_video_frame->linesize[0] = ndi_video_frame->line_stride_in_bytes;
 	obs_video_frame->data[0] = ndi_video_frame->p_data;
 
-	obs_sync_debug_log("OBS <- ndi_source_thread_process_video2",
-			   obs_source_get_name(obs_source), (int64_t)0,
+	obs_sync_debug_log("OBS <- ndi_source_thread_process_video2", obs_source_get_name(obs_source), (int64_t)0,
 			   obs_video_frame->timestamp);
-	OBS_SYNC_DEBUG_LOG_VIDEO_TIME("OBS <- ndi_source_thread",
-				      obs_source_get_name(obs_source),
-				      (int64_t)obs_video_frame->timestamp,
-				      obs_video_frame->data[0]);
-					  
+	OBS_SYNC_DEBUG_LOG_VIDEO_TIME("OBS <- ndi_source_thread", obs_source_get_name(obs_source),
+				      (int64_t)obs_video_frame->timestamp, obs_video_frame->data[0]);
+
 	obs_source_output_video(obs_source, obs_video_frame);
 }
 

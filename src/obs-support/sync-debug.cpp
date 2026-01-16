@@ -35,7 +35,7 @@ void obs_sync_debug_log(const char *message, const char *source_ndi_name,
 			timecodeStr =
 				(timecode == LLONG_MAX)
 					? "MAX"
-					: std::to_string(timecode / 1000000);
+					: std::to_string(timecode / 1000);
 		}
 
 		std::string timestampStr = "N/A";
@@ -44,10 +44,10 @@ void obs_sync_debug_log(const char *message, const char *source_ndi_name,
 			timestampStr =
 				(timestamp == LLONG_MAX)
 					? "MAX"
-					: std::to_string(timestamp / 1000000);
+					: std::to_string(timestamp / 1000);
 		}
 
-		obs_log(LOG_VERBOSE, "tc=%14s ts=%14s: %s", timecodeStr.c_str(),
+		obs_log(LOG_VERBOSE, "tc=%17s ts=%17s: %s", timecodeStr.c_str(),
 			timestampStr.c_str(), key.c_str());
 		lastLogTime[key] = now;
 	}
@@ -113,16 +113,14 @@ void obs_sync_debug_log_video_time(const char *message,
 		if (white_on_time[key] > (int64_t)0) {
 			wtimeStr = (white_on_time[key] == LLONG_MAX)
 					   ? "MAX"
-					   : std::to_string(white_on_time[key] /
-							    1000000);
+					   : std::to_string(white_on_time[key]);
 		}
 
 		std::string atimeStr = "N/A";
 		if (audio_on_time[key] > (int64_t)0) {
 			atimeStr = (audio_on_time[key] == LLONG_MAX)
 					   ? "MAX"
-					   : std::to_string(audio_on_time[key] /
-							    1000000);
+					   : std::to_string(audio_on_time[key]);
 		}
 
 		std::string dtimeStr = "N/A";
@@ -132,10 +130,10 @@ void obs_sync_debug_log_video_time(const char *message,
 			dtimeStr = ((audio_on_time[key] == LLONG_MAX) ||
 				    (white_on_time[key] == LLONG_MAX))
 					   ? "MAX"
-					   : std::to_string(diff / 1000000);
+					   : std::to_string(diff);
 		}
 		obs_log(LOG_VERBOSE,
-			"~___~___ Sync Test Data Found: AT %14s WT %14s: %5s %s",
+			"~___~___ Sync Test Data Found: AT %s WT %s: %s %s",
 			atimeStr.c_str(), wtimeStr.c_str(), dtimeStr.c_str(),
 			key.c_str());
 
