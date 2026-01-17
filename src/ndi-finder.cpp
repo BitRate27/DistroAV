@@ -33,7 +33,7 @@ void NDIFinder::retrieveNDISourceList()
 	NDIlib_find_create_t find_desc = {0};
 	find_desc.show_local_sources = true;
 	find_desc.p_groups = NULL;
-	NDIlib_find_instance_t ndi_find = ndiLib->find_create_v2(&find_desc);
+	NDIlib_find_instance_t ndi_find = NDIlib_find_create_v2(&find_desc);
 
 	if (!ndi_find) {
 		return;
@@ -43,9 +43,9 @@ void NDIFinder::retrieveNDISourceList()
 	uint32_t last_n_sources = 0;
 	const NDIlib_source_t *sources = NULL;
 	do {
-		ndiLib->find_wait_for_sources(ndi_find, 1000);
+		NDIlib_find_wait_for_sources(ndi_find, 1000);
 		last_n_sources = n_sources;
-		sources = ndiLib->find_get_current_sources(ndi_find, &n_sources);
+		sources = NDIlib_find_get_current_sources(ndi_find, &n_sources);
 	} while (n_sources > last_n_sources);
 
 	std::vector<std::string> newList;
@@ -58,5 +58,5 @@ void NDIFinder::retrieveNDISourceList()
 		NDISourceList = newList;
 	}
 
-	ndiLib->find_destroy(ndi_find);
+	NDIlib_find_destroy(ndi_find);
 }

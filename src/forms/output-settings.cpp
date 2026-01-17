@@ -119,7 +119,7 @@ If you are running a local build, don't forget to add your build info to the upd
 		}
 	});
 
-	auto ndiVersionText = QString(ndiLib->version());
+	auto ndiVersionText = QString(NDIlib_version());
 	ui->labelNdiVersion->setText(makeLink("#", QT_TO_UTF8(ndiVersionText)));
 	connect(ui->labelNdiVersion, &QLabel::linkActivated, [this, ndiVersionText](const QString &) {
 		QApplication::clipboard()->setText(ndiVersionText);

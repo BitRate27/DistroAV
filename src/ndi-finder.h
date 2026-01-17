@@ -6,7 +6,6 @@
 #include <mutex>
 #include <functional>
 #include <chrono>
-#include <Processing.NDI.Lib.h>
 
 class NDIFinder {
 public:

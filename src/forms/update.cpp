@@ -491,7 +491,7 @@ bool updateCheckStart(UserRequestCallback userRequestCallback)
 				 .arg(pluginVersion)
 				 .arg(obs_get_version_string())
 				 .arg(obsGuid)
-				 .arg(ndiLib->version())
+				 .arg(NDIlib_version())
 				 .arg(QSysInfo::prettyProductName())
 				 .arg(QSysInfo::currentCpuArchitecture())
 				 .arg(module_hash_sha256);
