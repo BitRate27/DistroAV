@@ -218,8 +218,23 @@ bool ndi_output_start(void *data)
 		send_desc.p_groups = nullptr;
 	send_desc.clock_video = false;
 	send_desc.clock_audio = false;
+	if (NDIAdvlib) {
+		const char *ndi_config_json = R"json(
+			{
+			  "ndi": {
+				"codec": {
+				  "shq": {
+					"mode": "4:2:2",
+					"quality": 100
+				  }
+				}
+			  }
+			}
+			)json";
+		o->ndi_sender = NDIAdvlib->send_create_v2(&send_desc, ndi_config_json);
+	} else if (ndiLib)
+		o->ndi_sender = ndiLib->send_create(&send_desc);
 
-	o->ndi_sender = ndiLib->send_create(&send_desc);
 	if (o->ndi_sender) {
 		o->started = obs_output_begin_data_capture(o->output, flags);
 		if (o->started) {
@@ -268,7 +283,12 @@ void ndi_output_stop(void *data, uint64_t)
 
 		if (o->ndi_sender) {
 			obs_log(LOG_DEBUG, "ndi_output_stop: +ndiLib->send_destroy(o->ndi_sender)");
-			ndiLib->send_destroy(o->ndi_sender);
+
+			if (NDIAdvlib)
+				NDIAdvlib->send_destroy(o->ndi_sender);
+			else if (ndiLib) {
+				ndiLib->send_destroy(o->ndi_sender);
+			}
 			obs_log(LOG_DEBUG, "ndi_output_stop: -ndiLib->send_destroy(o->ndi_sender)");
 			o->ndi_sender = nullptr;
 		}
@@ -335,8 +355,11 @@ void ndi_output_rawvideo(void *data, video_data *frame)
 		video_frame.p_data = frame->data[0];
 		video_frame.line_stride_in_bytes = frame->linesize[0];
 	}
-
-	ndiLib->send_send_video_async_v2(o->ndi_sender, &video_frame);
+	if (NDIAdvlib)
+		NDIAdvlib->send_send_video_async_v2(o->ndi_sender, &video_frame);
+	else if (ndiLib) {
+		ndiLib->send_send_video_async_v2(o->ndi_sender, &video_frame);
+	}
 }
 
 void ndi_output_rawaudio(void *data, audio_data *frame)
@@ -376,8 +399,10 @@ void ndi_output_rawaudio(void *data, audio_data *frame)
 	}
 
 	audio_frame.p_data = o->audio_conv_buffer;
-
-	ndiLib->send_send_audio_v3(o->ndi_sender, &audio_frame);
+	if (NDIAdvlib)
+		NDIAdvlib->send_send_audio_v3(o->ndi_sender, &audio_frame);
+	else if (ndiLib)
+		ndiLib->send_send_audio_v3(o->ndi_sender, &audio_frame);
 }
 
 obs_output_info create_ndi_output_info()

@@ -67,6 +67,14 @@ struct obs_source_info alpha_filter_info;
 const NDIlib_v6 *load_ndilib();
 
 typedef const NDIlib_v6 *(*NDIlib_v6_load_)(void);
+
+NDIAdvancedlib_t *load_advanced_ndilib();
+
+typedef const void *(*NDIAdvancedlib_v6_load_)(void);
+
+// Global pointer accessible by other modules: call like NDIAdvlib->send_create_v2(...)
+NDIAdvancedlib_t *NDIAdvlib = nullptr;
+
 QLibrary *loaded_lib = nullptr;
 
 OutputSettings *output_settings = nullptr;
@@ -291,6 +299,16 @@ bool obs_module_load(void)
 		return false;
 	}
 
+	NDIAdvlib = load_advanced_ndilib(); // try and load the advanced NDI library
+	if (!NDIAdvlib || !NDIAdvlib->send_create_v2) {
+		auto message = "Error-401: " + QTStr("NDIPlugin.LibError.Message") + "<br>";
+		obs_log(LOG_ERROR, "ERR-401 - Advanced NDI library failed to load with message: '%s'", QT_TO_UTF8(message));
+		obs_log(LOG_DEBUG, "obs_module_load: ERROR - load_advanced_ndilib() failed; message=%s", QT_TO_UTF8(message));
+	} else {
+		obs_log(LOG_INFO, "obs_module_load: Advanced NDI library detected ");
+		 // ('%s') ", ndiAdvLib->version());
+	}
+
 #if 0
 	// for testing purposes only
 	auto initialized = false;
@@ -489,4 +507,111 @@ const NDIlib_v6 *load_ndilib()
 		"ERR-404 - NDI library not found, DistroAV cannot continue. Read the wiki and install the NDI Libraries.");
 	obs_log(LOG_DEBUG, "load_ndilib: ERROR: Can't find the NDI library");
 	return nullptr;
+}
+
+NDIAdvancedlib_t *load_advanced_ndilib()
+{
+	NDIAdvancedlib_t *ndi_advanced_lib = nullptr;
+	auto locations = QStringList();
+	auto temp_path = QString(qgetenv(NDILIB_REDIST_FOLDER));
+	if (!temp_path.isEmpty()) {
+		locations << temp_path;
+	}
+#if defined(Q_OS_LINUX) || defined(Q_OS_MACOS)
+	// Linux, MacOS
+	// https://github.com/DistroAV/DistroAV/blob/master/lib/ndi/NDI%20SDK%20Documentation.pdf
+	// "6.1 LOCATING THE LIBRARY
+	// ... the redistributable on MacOS is installed within `/usr/local/lib` ..."
+	// Flatpak install will look for the NDI lib in /app/plugins/DistroAV/extra/lib
+	locations << "/usr/lib";
+	locations << "/usr/lib64";
+	locations << "/usr/local/lib";
+#if defined(Q_OS_LINUX)
+	locations << "/app/plugins/DistroAV/extra/lib";
+#endif
+#endif
+	auto lib_path = QString();
+#if defined(Q_OS_LINUX)
+	// Linux
+	auto regex = QRegularExpression("libndi\\.so\\.(\\d+)");
+	int max_version = 0;
+#endif
+	for (const auto &location : locations) {
+		auto dir = QDir(location);
+#if defined(Q_OS_LINUX)
+		// Linux
+		auto filters = QStringList("libndi.so.*");
+		dir.setNameFilters(filters);
+		auto file_names = dir.entryList(QDir::Files);
+		for (const auto &file_name : file_names) {
+			auto match = regex.match(file_name);
+			if (match.hasMatch()) {
+				int version = match.captured(1).toInt();
+				if (version > max_version) {
+					max_version = version;
+					lib_path = dir.absoluteFilePath(file_name);
+				}
+			}
+		}
+#else
+		// MacOS, Windows
+		temp_path = QDir::cleanPath(dir.absoluteFilePath(NDILIB_ADVANCED_LIBRARY_NAME));
+		obs_log(LOG_DEBUG, "load_advanced_ndilib: Trying '%s'", QT_TO_UTF8(QDir::toNativeSeparators(temp_path)));
+		auto file_info = QFileInfo(temp_path);
+		if (file_info.exists() && file_info.isFile()) {
+			lib_path = temp_path;
+			break;
+		}
+#endif
+	}
+	if (!lib_path.isEmpty()) {
+		obs_log(LOG_DEBUG, "load_advanced_ndilib: Found '%s'; attempting to load NDI library...",
+			QT_TO_UTF8(QDir::toNativeSeparators(lib_path)));
+		auto loaded_lib = new QLibrary(lib_path, nullptr);
+		if (loaded_lib->load()) {
+			obs_log(LOG_DEBUG, "load_advanced_ndilib: NDI library loaded successfully");
+
+			// Resolve advanced send-related functions directly from the DLL.
+			auto resolved_send_create_v2 = reinterpret_cast<NDIlib_send_instance_t (*)(const void *, const char *)>(
+				loaded_lib->resolve("NDIlib_send_create_v2"));
+			auto resolved_send_destroy = reinterpret_cast<void (*)(NDIlib_send_instance_t)>(
+				loaded_lib->resolve("NDIlib_send_destroy"));
+			auto resolved_send_send_audio_v3 = reinterpret_cast<void (*)(NDIlib_send_instance_t, const NDIlib_audio_frame_v3_t *)>(
+				loaded_lib->resolve("NDIlib_send_send_audio_v3"));
+			auto resolved_send_send_video_async_v2 = reinterpret_cast<void (*)(NDIlib_send_instance_t, const NDIlib_video_frame_v2_t *)>(
+				loaded_lib->resolve("NDIlib_send_send_video_async_v2"));
+			auto resolved_send_send_video_v2 =
+				reinterpret_cast<void (*)(NDIlib_send_instance_t, const NDIlib_video_frame_v2_t *)>(
+					loaded_lib->resolve("NDIlib_send_send_video_v2"));
+			if (resolved_send_create_v2 && resolved_send_destroy && resolved_send_send_audio_v3 &&
+			    resolved_send_send_video_async_v2 && resolved_send_send_video_v2) {
+				// allocate and populate ndi_advanced_lib struct
+				ndi_advanced_lib = new NDIAdvancedlib_t();
+				ndi_advanced_lib->send_create_v2 = resolved_send_create_v2;
+				ndi_advanced_lib->send_destroy = resolved_send_destroy;
+				ndi_advanced_lib->send_send_audio_v3 = resolved_send_send_audio_v3;
+				ndi_advanced_lib->send_send_video_async_v2 = resolved_send_send_video_async_v2;
+				ndi_advanced_lib->send_send_video_v2 = resolved_send_send_video_v2;
+
+				obs_log(LOG_DEBUG, "load_advanced_ndilib: Advanced NDI functions resolved and populated");
+				return ndi_advanced_lib;
+			} else {
+				obs_log(LOG_ERROR, "ERR-405 - Advanced NDI functions missing in loaded library: create=%p destroy=%p audio_v3=%p video_async_v2=%p",
+					resolved_send_create_v2, resolved_send_destroy, resolved_send_send_audio_v3, resolved_send_send_video_async_v2);
+				obs_log(LOG_DEBUG, "load_advanced_ndilib: ERROR: required advanced functions not found in library");
+			}
+		} else {
+			obs_log(LOG_ERROR, "ERR-402 - Error loading QLibrary with error: '%s'",
+				QT_TO_UTF8(loaded_lib->errorString()));
+			obs_log(LOG_DEBUG, "load_advanced_ndilib: ERROR: QLibrary returned the following error: '%s'",
+				QT_TO_UTF8(loaded_lib->errorString()));
+			delete loaded_lib;
+			loaded_lib = nullptr;
+		}
+	}
+
+	obs_log(LOG_ERROR,
+		"ERR-404 - NDI library not found, DistroAV cannot continue. Read the wiki and install the NDI Libraries.");
+	obs_log(LOG_DEBUG, "load_advanced_ndilib: ERROR: Can't find the NDI library");
+	return ndi_advanced_lib;
 }

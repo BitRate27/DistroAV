@@ -24,6 +24,7 @@
 #include "obs-support/obs-app.hpp"
 
 #include <Processing.NDI.Lib.h>
+#include <Processing.NDI.Advanced.h>
 
 #define PLUGIN_MIN_QT_VERSION "6.0.0"
 #define PLUGIN_MIN_OBS_VERSION "31.0.0"
@@ -32,6 +33,18 @@
 #define OBS_NDI_ALPHA_FILTER_ID "premultiplied_alpha_filter"
 
 extern const NDIlib_v6 *ndiLib;
+
+// Container for advanced NDI function pointers
+struct NDIAdvancedlib_t {
+	NDIlib_send_instance_t (*send_create_v2)(const void *p_create_settings, const char *p_config_data);
+	void (*send_destroy)(NDIlib_send_instance_t p_instance);
+	void (*send_send_audio_v3)(NDIlib_send_instance_t p_instance, const NDIlib_audio_frame_v3_t *p_audio_data);
+	void (*send_send_video_async_v2)(NDIlib_send_instance_t p_instance,
+					 const NDIlib_video_frame_v2_t *p_video_data);
+	void (*send_send_video_v2)(NDIlib_send_instance_t p_instance, const NDIlib_video_frame_v2_t *p_video_data);
+};
+// Global pointer accessible by other modules: call like NDIAdvlib->send_create_v2(...)
+extern NDIAdvancedlib_t *NDIAdvlib;
 
 /*
 The following accomplishes two goals:
@@ -106,3 +119,4 @@ QString makeLink(const char *url, const char *text = nullptr);
 // "Your application’s About Box and any other locations where trademark attribution is provided
 // should also specifically indicate that “NDI® is a registered trademark of Vizrt NDI AB”."
 #define NDI_IS_A_REGISTERED_TRADEMARK_TEXT "NDI® is a registered trademark of Vizrt NDI AB"
+#define NDILIB_ADVANCED_LIBRARY_NAME "Processing.NDI.Lib.Advanced.x64.dll"
