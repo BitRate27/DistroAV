@@ -77,6 +77,7 @@ target_sources(
     src/main-output.h
     src/ndi-filter.cpp
     src/ndi-finder.h
+    src/ndi-shared.h
     src/ndi-finder.cpp
     src/ndi-output.cpp
     src/ndi-source.cpp

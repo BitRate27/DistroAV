@@ -18,6 +18,8 @@
 #include "plugin-main.h"
 #include <util/threading.h>
 #include <chrono>
+#include <sstream>
+#include <ndi-shared.h>
 
 // #include "plugin-support.h"
 
@@ -56,6 +58,25 @@ static void convert_i444_to_uyvy(uint8_t *input[], uint32_t in_linesize[], uint3
 	}
 }
 
+typedef struct ndi_server_connection_t {
+	HANDLE hShmReq;
+	HANDLE hShmReqA;
+	HANDLE hShmRsp;
+	HANDLE hEvtCmd;
+	HANDLE hEvtRsp;
+	HANDLE hEvtCmdA;
+	HANDLE hEvtRspA;
+	HANDLE hEvtReady;
+	RequestBlock *pReq;
+	RequestBlock *pReqA;
+	ResponseBlock *pRsp;
+	int error;
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+	bool running;
+	bool sender_created;
+} ndi_server_connection_t;
+
 typedef struct {
 	obs_output_t *output;
 	const char *ndi_name;
@@ -84,7 +105,301 @@ typedef struct {
 	size_t audio_conv_buffer_size;
 	int32_t no_connections;
 	std::chrono::time_point<std::chrono::steady_clock> last_conn_check;
+	ndi_server_connection_t server_conn;
 } ndi_output_t;
+
+void destroy_ndi_server(ndi_server_connection_t &conn)
+{
+	// Cleanup
+	// Kill the server process if it's still running
+	if (conn.running) {
+		conn.pReq->command = NDI_SHUTDOWN;
+		SetEvent(conn.hEvtCmd);
+		WaitForSingleObject(conn.hEvtRsp, NDI_SERVER_WAIT);
+	}
+
+	if (conn.pReq)
+		UnmapViewOfFile(conn.pReq);
+	if (conn.pReqA)
+		UnmapViewOfFile(conn.pReqA);
+	if (conn.pRsp)
+		UnmapViewOfFile(conn.pRsp);
+	if (conn.hShmReq)
+		CloseHandle(conn.hShmReq);
+	if (conn.hShmReq)
+		CloseHandle(conn.hShmReq);
+	if (conn.hShmRsp)
+		CloseHandle(conn.hShmRsp);
+	if (conn.hEvtCmd)
+		CloseHandle(conn.hEvtCmd);
+	if (conn.hEvtRsp)
+		CloseHandle(conn.hEvtRsp);
+	if (conn.hEvtCmdA)
+		CloseHandle(conn.hEvtCmdA);
+	if (conn.hEvtRspA)
+		CloseHandle(conn.hEvtRspA);
+	if (conn.hEvtReady)
+		CloseHandle(conn.hEvtReady);
+	conn = {0};
+	return;
+};
+
+// Create an NDI server and launch the server process. Returns a struct with connection handles and pointers, or an error code if failed.
+ndi_server_connection_t create_ndi_server(const char *output_name)
+{
+	ndi_server_connection_t conn = {0};
+	conn.running = false;
+	conn.sender_created = false;
+
+	const WCHAR *memPrefix = NDI_MEM_NAME_PREFIX;
+
+	// Create a unique ID for shared memory so ndi-servers do not collide
+	std::wostringstream uniqueID;
+	uniqueID << output_name << GetCurrentProcessId();
+	std::wstring ustr = uniqueID.str();
+
+	WCHAR connectionName[256] = {0};
+	WCHAR requestShmName[256] = {0};
+	WCHAR requestShmNameA[256] = {0};
+	WCHAR responseShmName[256] = {0};
+	WCHAR commandEventName[256] = {0};
+	WCHAR commandEventNameA[256] = {0};
+	WCHAR readyEventName[256] = {0};
+	WCHAR responseEventName[256] = {0};
+	WCHAR responseEventNameA[256] = {0};
+
+	// argv[1] is the shared memory name (narrow). Convert to wide.
+	swprintf_s(connectionName, 256, L"%s%s", NDI_MEM_NAME_PREFIX, ustr.c_str());
+	swprintf_s(requestShmName, 256, L"%s%s", connectionName, NDI_REQUEST_SHM_SUFFIX);
+	swprintf_s(requestShmNameA, 256, L"%s%s", connectionName, NDI_AREQUEST_SHM_SUFFIX);
+	swprintf_s(responseShmName, 256, L"%s%s", connectionName, NDI_RESPONSE_SHM_SUFFIX);
+	swprintf_s(commandEventName, 256, L"%s%s", connectionName, NDI_COMMAND_EVENT_SUFFIX);
+	swprintf_s(readyEventName, 256, L"%s%s", connectionName, NDI_READY_EVENT_SUFFIX);
+	swprintf_s(responseEventName, 256, L"%s%s", connectionName, NDI_RESPONSE_EVENT_SUFFIX);
+	swprintf_s(commandEventNameA, 256, L"%s%s", connectionName, NDI_ACOMMAND_EVENT_SUFFIX);
+	swprintf_s(responseEventNameA, 256, L"%s%s", connectionName, NDI_ARESPONSE_EVENT_SUFFIX);
+
+	//    Boost priority
+	//SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+	//SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+
+	//
+	//  1.  Create shared-memory file mappings backed by the system pagefile.
+	//      Using INVALID_HANDLE_VALUE means "pagefile-backed" (anonymous shm).
+	//      High 32-bit size word first for the large response buffer.
+	//
+	const DWORD reqHi = (DWORD)(((UINT64)sizeof(RequestBlock)) >> 32);
+	const DWORD reqLo = (DWORD)((UINT64)sizeof(RequestBlock) & 0xFFFFFFFFu);
+	conn.hShmReq = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, reqHi, reqLo, requestShmName);
+	if (!conn.hShmReq || GetLastError() == ERROR_ALREADY_EXISTS) {
+		obs_log(LOG_ERROR, "CreateFileMapping(request) is another instance already running?");
+		conn.error = 1;
+		return conn;
+	}
+
+	conn.hShmReqA = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, reqHi, reqLo, requestShmNameA);
+	if (!conn.hShmReqA || GetLastError() == ERROR_ALREADY_EXISTS) {
+		obs_log(LOG_ERROR, "CreateFileMapping(requestA) is another instance already running?");
+		conn.error = 1;
+		return conn;
+	}
+
+	const DWORD rspHi = (DWORD)(((UINT64)sizeof(ResponseBlock)) >> 32);
+	const DWORD rspLo = (DWORD)((UINT64)sizeof(ResponseBlock) & 0xFFFFFFFFu);
+	conn.hShmRsp = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, rspHi, rspLo, responseShmName);
+	if (!conn.hShmRsp || GetLastError() == ERROR_ALREADY_EXISTS) {
+		obs_log(LOG_ERROR, "CreateFileMapping(response) is another instance already running?");
+		destroy_ndi_server(conn);
+		conn.error = 2;
+		return conn;
+	}
+
+	//    2.  Create auto-reset named events
+	//   FALSE initial state, FALSE manual-reset (= auto-reset)
+	conn.hEvtCmd = CreateEventW(nullptr, FALSE, FALSE, commandEventName);
+	if (!conn.hEvtCmd) {
+		destroy_ndi_server(conn);
+		obs_log(LOG_ERROR, "CreateEvent(cmd)");
+		conn.error = 3;
+		return conn;
+	}
+
+	conn.hEvtRsp = CreateEventW(nullptr, FALSE, FALSE, responseEventName);
+	if (!conn.hEvtRsp) {
+		destroy_ndi_server(conn);
+		obs_log(LOG_ERROR, "CreateEvent(rsp)");
+		conn.error = 4;
+		return conn;
+	}
+
+	conn.hEvtCmdA = CreateEventW(nullptr, FALSE, FALSE, commandEventNameA);
+	if (!conn.hEvtCmdA) {
+		destroy_ndi_server(conn);
+		obs_log(LOG_ERROR, "CreateEvent(cmdA)");
+		conn.error = 3;
+		return conn;
+	}
+
+	conn.hEvtRspA = CreateEventW(nullptr, FALSE, FALSE, responseEventNameA);
+	if (!conn.hEvtRspA) {
+		destroy_ndi_server(conn);
+		obs_log(LOG_ERROR, "CreateEvent(rspA)");
+		conn.error = 4;
+		return conn;
+	}
+
+	// The "ready" event is manual-reset so we can call WaitForSingleObject
+	// after the server has already set it (won't miss it).
+	conn.hEvtReady = CreateEventW(nullptr, TRUE /*manual*/, FALSE, readyEventName);
+	if (!conn.hEvtReady) {
+		destroy_ndi_server(conn);
+		conn.error = 5;
+		obs_log(LOG_ERROR, "CreateEvent(ready)");
+		return conn;
+	}
+
+	//    3.  Map views
+	conn.pReq =
+		static_cast<RequestBlock *>(MapViewOfFile(conn.hShmReq, FILE_MAP_WRITE, 0, 0, sizeof(RequestBlock)));
+	if (!conn.pReq) {
+		destroy_ndi_server(conn);
+		conn.error = 6;
+		obs_log(LOG_ERROR, "MapViewOfFile(request)");
+		return conn;
+	}
+	
+	conn.pReqA =
+		static_cast<RequestBlock *>(MapViewOfFile(conn.hShmReqA, FILE_MAP_WRITE, 0, 0, sizeof(RequestBlock)));
+	if (!conn.pReqA) {
+		destroy_ndi_server(conn);
+		conn.error = 6;
+		obs_log(LOG_ERROR, "MapViewOfFile(requestA)");
+		return conn;
+	}
+
+	conn.pRsp =
+		static_cast<ResponseBlock *>(MapViewOfFile(conn.hShmRsp, FILE_MAP_READ, 0, 0, sizeof(ResponseBlock)));
+	if (!conn.pRsp) {
+		conn.error = 7;
+		destroy_ndi_server(conn);
+		obs_log(LOG_ERROR, "MapViewOfFile(response)");
+		return conn;
+	}
+
+	//    4.  Write client PID so the server can monitor us
+	memset(conn.pReq, 0, sizeof(RequestBlock));
+	conn.pReq->client_pid = GetCurrentProcessId();
+
+	//    5.  Launch server.exe
+	// --- Spawn the ndi-server from same directory as this module ---
+	WCHAR modulePath[MAX_PATH] = {0};
+	WCHAR exePath[MAX_PATH] = {0};
+
+	// Get HMODULE for this code module using address of this function
+	HMODULE hMod = NULL;
+	if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+			       reinterpret_cast<LPCWSTR>(reinterpret_cast<LPVOID>(destroy_ndi_server)), &hMod)) {
+		if (GetModuleFileNameW(hMod, modulePath, MAX_PATH) > 0) {
+			WCHAR *last = wcsrchr(modulePath, L'\\');
+			if (last) {
+				// Keep trailing backslash
+				*(last + 1) = L'\0';
+				swprintf_s(exePath, MAX_PATH, L"%sndi-server.exe", modulePath);
+			}
+		}
+	}
+
+	// Fallback to simple name if resolution failed
+	if (exePath[0] == L'\0') {
+		swprintf_s(exePath, MAX_PATH, L"ndi-server.exe");
+	}
+
+	// Check that the executable exists and is not a directory. If missing, log an error so it's visible.
+	DWORD attrs = GetFileAttributesW(exePath);
+	if (attrs == INVALID_FILE_ATTRIBUTES || (attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+		obs_log(LOG_ERROR, "Missing ndi-server.exe at expected path: %ls\n", exePath);
+		destroy_ndi_server(conn);
+		conn.error = 7;
+		return conn;
+	}
+
+	// Build command line (quote path in case it contains spaces)
+	WCHAR cmdLine[512];
+
+	swprintf_s(cmdLine, 512, L"\"%s\" \"%s\" --log", exePath, ustr.c_str());
+	//swprintf_s(cmdLine, 512, L"\"%s\" \"%s\"", exePath, ustr.c_str());
+	conn.si = {sizeof(conn.si)};
+	conn.pi = {};
+	ZeroMemory(&conn.si, sizeof(conn.si));
+	conn.si.cb = sizeof(conn.si);
+	if (!NDI_SERVER_DEBUG) {
+		conn.si.dwFlags |= STARTF_USESHOWWINDOW;
+		conn.si.wShowWindow = SW_HIDE;
+	}
+
+	ZeroMemory(&conn.pi, sizeof(conn.pi));
+	DWORD creationFlags = CREATE_NO_WINDOW;
+	if (NDI_SERVER_DEBUG)
+		creationFlags = CREATE_NEW_CONSOLE;
+	obs_log(LOG_INFO, "Spawning ndi-server with command line: %ls", cmdLine);
+
+	if (!CreateProcessW(exePath,          // application
+			    cmdLine,          // command line
+			    nullptr, nullptr, // process / thread security
+			    FALSE,            // do NOT inherit handles (keeps things clean)
+			    creationFlags, nullptr, nullptr, &conn.si, &conn.pi)) {
+
+		obs_log(LOG_INFO, "CreateProcess(ndi-server.exe)  � make sure ndi-server.exe is next to distroav.dll");
+		destroy_ndi_server(conn);
+		conn.error = 9;
+		return conn;
+	}
+
+	CloseHandle(conn.pi.hThread); // we don't need the thread handle
+	obs_log(LOG_INFO, "[Client] Server PID: %u.  Waiting for ready signal (up to 5 s)...", conn.pi.dwProcessId);
+
+	//    6.  Wait for the server to finish pre-faulting and signal ready
+	if (WaitForSingleObject(conn.hEvtReady, NDI_SERVER_WAIT) != WAIT_OBJECT_0) {
+		destroy_ndi_server(conn);
+		conn.error = 8;
+		obs_log(LOG_INFO, "[Client] ndi-server did not signal ready within 5 s.\n");
+		return conn;
+	}
+	obs_log(LOG_INFO, "[Client] ndi-server is ready.");
+
+	//    7.  Pre-fault our read view of the response buffer
+	obs_log(LOG_INFO, "[Client] Pre-faulting shm (%u MB)...", sizeof(ResponseBlock) / (1024u * 1024u));
+	PrefaultRegionRead(conn.pRsp, sizeof(ResponseBlock));
+	PrefaultRegionRead(conn.pReq, sizeof(ResponseBlock));
+	PrefaultRegionRead(conn.pReqA, sizeof(ResponseBlock));
+	obs_log(LOG_INFO, "[Client] Pre-fault complete.");
+
+	conn.running = true;
+	conn.sender_created = false;
+	return conn;
+}
+
+// If the ndi name is unchanged from the existing connection, will not create a new connection, but will
+// send command to create new receiver on server with recv_desc parameters.
+void create_ndi_sender(ndi_server_connection_t &conn, NDIlib_send_create_t send_desc)
+{
+	size_t out_written = 0;
+	serialize_send_desc(send_desc, &conn.pReq->payload, sizeof(conn.pReq->payload), out_written);
+
+	// Signal the consumer that new data is ready
+	conn.pReq->command = NDI_CREATE_SENDER;
+	SetEvent(conn.hEvtCmd);
+	DWORD w = WaitForSingleObject(conn.hEvtRsp, NDI_SERVER_WAIT);
+	if (w != WAIT_OBJECT_0) {
+		obs_log(LOG_ERROR, "Timed out waiting for ndi-server create a sender");
+		destroy_ndi_server(conn);
+		return;
+	}
+	obs_log(LOG_INFO, "NDI sender creation command sent to server, out_written=%zu", out_written);
+	conn.error = 0;
+	conn.sender_created = true;
+	return;
+}
 
 const char *ndi_output_getname(void *)
 {
@@ -231,9 +546,22 @@ bool ndi_output_start(void *data)
 	send_desc.clock_audio = false;
 
 	pthread_mutex_lock(&o->ndi_sender_mutex);
-	o->ndi_sender = ndiLib->send_create(&send_desc);
+	if (!o->server_conn.running) {
+		o->server_conn = create_ndi_server(name);
+		if (o->server_conn.error != 0) {
+			obs_log(LOG_ERROR, "Failed to create NDI server for output '%s', error code %d", name, o->server_conn.error);
+			obs_log(LOG_DEBUG, "'%s' ndi_output_start: failed to create ndi server, error code %d", name,
+				o->server_conn.error);
+		} else {
+			create_ndi_sender(o->server_conn, send_desc);
+		}
+	}
 
-	if (o->ndi_sender) {
+	if (!o->server_conn.running || !o->server_conn.sender_created) {
+		o->ndi_sender = ndiLib->send_create(&send_desc);
+	}
+
+	if (o->ndi_sender || (o->server_conn.running && o->server_conn.sender_created)) {
 		o->started = obs_output_begin_data_capture(o->output, flags);
 		if (o->started) {
 			obs_log(LOG_INFO, "NDI Output started successfully. '%s'", name);
@@ -289,7 +617,11 @@ void ndi_output_stop(void *data, uint64_t)
 			o->ndi_sender = nullptr;
 			pthread_mutex_unlock(&o->ndi_sender_mutex);
 		}
-
+		if (o->server_conn.running && o->server_conn.sender_created)
+		{
+			destroy_ndi_server(o->server_conn);
+			obs_log(LOG_DEBUG, "ndi_output_stop: destroy_ndi_server");
+		}
 		if (o->conv_buffer) {
 			delete[] o->conv_buffer;
 			o->conv_buffer = nullptr;
@@ -334,25 +666,28 @@ void ndi_output_rawvideo(void *data, video_data *frame)
 		return;
 
 	pthread_mutex_lock(&o->ndi_sender_mutex);
-	if (!o->ndi_sender) {
+	if (!o->ndi_sender && !(o->server_conn.running && o->server_conn.sender_created)) {
 		pthread_mutex_unlock(&o->ndi_sender_mutex);
 		return;
 	}
 
 	// Throttle calls to send_get_no_connections to at most once per second
-	auto now = std::chrono::steady_clock::now();
-	if (now - o->last_conn_check >= std::chrono::seconds(1)) {
-		int nc = ndiLib->send_get_no_connections(o->ndi_sender, 10);
-		o->last_conn_check = now;
+	if (o->ndi_sender) {
+		auto now = std::chrono::steady_clock::now();
+		if (now - o->last_conn_check >= std::chrono::seconds(1)) {
+			int nc = ndiLib->send_get_no_connections(o->ndi_sender, 10);
+			o->last_conn_check = now;
 
-		if (nc != o->no_connections) {
-			auto ndi_source = ndiLib->send_get_source_name(o->ndi_sender);
-			if (nc <= 0)
-				obs_log(LOG_DEBUG, "NDI Output video '%s' has no connections.", ndi_source->p_ndi_name);
-			else if (o->no_connections == 0)
-				obs_log(LOG_DEBUG, "NDI Output video '%s' has %d connections.", ndi_source->p_ndi_name,
-					nc);
-			o->no_connections = nc;
+			if (nc != o->no_connections) {
+				auto ndi_source = ndiLib->send_get_source_name(o->ndi_sender);
+				if (nc <= 0)
+					obs_log(LOG_DEBUG, "NDI Output video '%s' has no connections.",
+						ndi_source->p_ndi_name);
+				else if (o->no_connections == 0)
+					obs_log(LOG_DEBUG, "NDI Output video '%s' has %d connections.",
+						ndi_source->p_ndi_name, nc);
+				o->no_connections = nc;
+			}
 		}
 	}
 
@@ -381,7 +716,35 @@ void ndi_output_rawvideo(void *data, video_data *frame)
 		video_frame.line_stride_in_bytes = frame->linesize[0];
 	}
 
-	ndiLib->send_send_video_async_v2(o->ndi_sender, &video_frame);
+	if (o->ndi_sender) {
+		ndiLib->send_send_video_async_v2(o->ndi_sender, &video_frame);
+	}
+	if (o->server_conn.running && o->server_conn.sender_created) {
+		serialize_frame(NDIlib_frame_type_video, (const void *)&video_frame, o->server_conn.pReq->payload,
+				sizeof(o->server_conn.pReq->payload),true);
+		NDIlib_frame_type_e frame_received = NDIlib_frame_type_none;
+		NDIlib_video_frame_v2_t video_frame_test;
+		NDIlib_audio_frame_v3_t audio_frame_test;
+		uint8_t *in_buf = o->server_conn.pReq->payload;
+		size_t frame_len = deserialize_frame(in_buf, sizeof(o->server_conn.pReq->payload), frame_received,
+						     &video_frame_test,
+						     &audio_frame_test, true);
+		if (frame_received != NDIlib_frame_type_video ||
+		    video_frame_test.xres != video_frame.xres || video_frame_test.yres != video_frame.yres) {
+			printf("Video deserialization failed or resolution mismatch (received type %d, res %dx%d, expected type %d, res %dx%d)\n",
+			       frame_received, video_frame_test.xres, video_frame_test.yres, NDIlib_frame_type_video,
+			       video_frame.xres, video_frame.yres);
+		}
+		o->server_conn.pReq->command = NDI_SEND_VIDEO_FRAME;
+		SetEvent(o->server_conn.hEvtCmd);
+
+		DWORD w = WaitForSingleObject(o->server_conn.hEvtRsp, NDI_SERVER_WAIT);
+		if (w != WAIT_OBJECT_0) {
+			obs_log(LOG_ERROR, "Timed out waiting for ndi-server send video frame");
+			destroy_ndi_server(o->server_conn);
+			return;
+		}
+	}
 }
 
 void ndi_output_rawaudio(void *data, audio_data *frame)
@@ -393,28 +756,30 @@ void ndi_output_rawaudio(void *data, audio_data *frame)
 		return;
 
 	pthread_mutex_lock(&o->ndi_sender_mutex);
-	if (!o->ndi_sender) {
+	if (!o->ndi_sender && !(o->server_conn.running && o->server_conn.sender_created)) {
 		pthread_mutex_unlock(&o->ndi_sender_mutex);
 		return;
 	}
 
-	auto now = std::chrono::steady_clock::now();
-	if (now - o->last_conn_check >= std::chrono::seconds(1)) {
-		o->last_conn_check = now;
+	if (o->ndi_sender) {
+		auto now = std::chrono::steady_clock::now();
+		if (now - o->last_conn_check >= std::chrono::seconds(1)) {
+			o->last_conn_check = now;
 
-		int nc = ndiLib->send_get_no_connections(o->ndi_sender, 10);
+			int nc = ndiLib->send_get_no_connections(o->ndi_sender, 10);
 
-		if (nc != o->no_connections) {
-			auto ndi_source = ndiLib->send_get_source_name(o->ndi_sender);
-			if (nc <= 0)
-				obs_log(LOG_DEBUG, "NDI Output audio '%s' has no connections.", ndi_source->p_ndi_name);
-			else if (o->no_connections == 0)
-				obs_log(LOG_DEBUG, "NDI Output audio '%s' has %d connections.", ndi_source->p_ndi_name,
-					nc);
-			o->no_connections = nc;
+			if (nc != o->no_connections) {
+				auto ndi_source = ndiLib->send_get_source_name(o->ndi_sender);
+				if (nc <= 0)
+					obs_log(LOG_DEBUG, "NDI Output audio '%s' has no connections.",
+						ndi_source->p_ndi_name);
+				else if (o->no_connections == 0)
+					obs_log(LOG_DEBUG, "NDI Output audio '%s' has %d connections.",
+						ndi_source->p_ndi_name, nc);
+				o->no_connections = nc;
+			}
 		}
 	}
-
 	pthread_mutex_unlock(&o->ndi_sender_mutex);
 
 	NDIlib_audio_frame_v3_t audio_frame = {0};
@@ -446,8 +811,22 @@ void ndi_output_rawaudio(void *data, audio_data *frame)
 	}
 
 	audio_frame.p_data = o->audio_conv_buffer;
+	if (o->ndi_sender) {
+		ndiLib->send_send_audio_v3(o->ndi_sender, &audio_frame);
+	}
 
-	ndiLib->send_send_audio_v3(o->ndi_sender, &audio_frame);
+	if (o->server_conn.running && o->server_conn.sender_created) {
+		serialize_frame(NDIlib_frame_type_audio, (const void *)&audio_frame, o->server_conn.pReqA->payload,
+				sizeof(o->server_conn.pReqA->payload), true);
+		o->server_conn.pReqA->command = NDI_SEND_AUDIO_FRAME;
+		SetEvent(o->server_conn.hEvtCmdA);
+		DWORD w = WaitForSingleObject(o->server_conn.hEvtRspA, NDI_SERVER_WAIT);
+		if (w != WAIT_OBJECT_0) {
+			obs_log(LOG_ERROR, "Timed out waiting for ndi-server send audio");
+			destroy_ndi_server(o->server_conn);
+			return;
+		}
+	}
 }
 
 obs_output_info create_ndi_output_info()
