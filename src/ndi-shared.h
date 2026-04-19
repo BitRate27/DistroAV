@@ -12,19 +12,22 @@
 
 #define NDI_MEM_NAME_PREFIX       L"Local\\NDI_"
 #define NDI_REQUEST_SHM_SUFFIX    L"_RequestShm"
-#define NDI_AREQUEST_SHM_SUFFIX    L"_RequestShm"
+#define NDI_AREQUEST_SHM_SUFFIX    L"_RequestShmA"
 #define NDI_RESPONSE_SHM_SUFFIX   L"_ResponseShm"
 #define NDI_COMMAND_EVENT_SUFFIX  L"_CommandEvent"
-#define NDI_ACOMMAND_EVENT_SUFFIX  L"_ACommandEvent"
+#define NDI_ACOMMAND_EVENT_SUFFIX  L"_CommandEventA"
 #define NDI_READY_EVENT_SUFFIX    L"_ReadyEvent"
 #define NDI_RESPONSE_EVENT_SUFFIX L"_ResponseEvent"
-#define NDI_ARESPONSE_EVENT_SUFFIX L"_ResponseEvent"
+#define NDI_ARESPONSE_EVENT_SUFFIX L"_ResponseEventA"
 #define NDI_CREATE_RECEIVER       100
 #define NDI_CAPTURE_FRAME         200
 #define NDI_SHUTDOWN              300
 #define NDI_HARDWARE_ACCELERATION 400
 #define NDI_CAPTURE_FRAME_SYNC    500
 #define NDI_CREATE_SENDER         600
+#define NDI_CREATE_SENDER_FAILED  601
+#define NDI_INVALID_LICENSE       602
+#define NDI_SENDER_CREATED        0
 #define NDI_DESTROY_SENDER        700
 #define NDI_SEND_VIDEO_FRAME      800
 #define NDI_SEND_AUDIO_FRAME      900

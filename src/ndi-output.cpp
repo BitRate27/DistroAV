@@ -126,8 +126,8 @@ void destroy_ndi_server(ndi_server_connection_t &conn)
 		UnmapViewOfFile(conn.pRsp);
 	if (conn.hShmReq)
 		CloseHandle(conn.hShmReq);
-	if (conn.hShmReq)
-		CloseHandle(conn.hShmReq);
+	if (conn.hShmReqA)
+		CloseHandle(conn.hShmReqA);
 	if (conn.hShmRsp)
 		CloseHandle(conn.hShmRsp);
 	if (conn.hEvtCmd)
@@ -289,6 +289,8 @@ ndi_server_connection_t create_ndi_server(const char *output_name)
 	//    4.  Write client PID so the server can monitor us
 	memset(conn.pReq, 0, sizeof(RequestBlock));
 	conn.pReq->client_pid = GetCurrentProcessId();
+	memset(conn.pReqA, 0, sizeof(RequestBlock));
+	conn.pReqA->client_pid = GetCurrentProcessId();
 
 	//    5.  Launch server.exe
 	// --- Spawn the ndi-server from same directory as this module ---
@@ -362,7 +364,7 @@ ndi_server_connection_t create_ndi_server(const char *output_name)
 	if (WaitForSingleObject(conn.hEvtReady, NDI_SERVER_WAIT) != WAIT_OBJECT_0) {
 		destroy_ndi_server(conn);
 		conn.error = 8;
-		obs_log(LOG_INFO, "[Client] ndi-server did not signal ready within 5 s.\n");
+		obs_log(LOG_INFO, "[Client] ndi-server did not signal ready within %d s.\n",NDI_SERVER_WAIT/1000);
 		return conn;
 	}
 	obs_log(LOG_INFO, "[Client] ndi-server is ready.");
@@ -370,9 +372,8 @@ ndi_server_connection_t create_ndi_server(const char *output_name)
 	//    7.  Pre-fault our read view of the response buffer
 	obs_log(LOG_INFO, "[Client] Pre-faulting shm (%u MB)...", sizeof(ResponseBlock) / (1024u * 1024u));
 	PrefaultRegionRead(conn.pRsp, sizeof(ResponseBlock));
-	PrefaultRegionRead(conn.pReq, sizeof(ResponseBlock));
-	PrefaultRegionRead(conn.pReqA, sizeof(ResponseBlock));
-	obs_log(LOG_INFO, "[Client] Pre-fault complete.");
+	PrefaultRegionRead(conn.pReq, sizeof(RequestBlock));
+	PrefaultRegionRead(conn.pReqA, sizeof(RequestBlock));
 
 	conn.running = true;
 	conn.sender_created = false;
@@ -396,8 +397,23 @@ void create_ndi_sender(ndi_server_connection_t &conn, NDIlib_send_create_t send_
 		return;
 	}
 	obs_log(LOG_INFO, "NDI sender creation command sent to server, out_written=%zu", out_written);
-	conn.error = 0;
-	conn.sender_created = true;
+	conn.error = conn.pRsp->payload_type;
+	conn.sender_created = conn.error == NDI_SENDER_CREATED;
+	if (conn.sender_created) {
+		obs_log(LOG_INFO, "NDI Advanced SDK sender created on ndi-server");
+	} else {
+		if (conn.error == NDI_CREATE_SENDER_FAILED) {
+			obs_log(LOG_ERROR, "NDI sender name is already in use. Please choose a different name. ('%s')",
+				send_desc.p_ndi_name);
+		} else if (conn.error == NDI_INVALID_LICENSE) {
+			obs_log(LOG_ERROR,
+				"Invalid Advanced SDK license, sender not created, ndi-server terminated, error code %d",
+				conn.error);
+			destroy_ndi_server(conn);
+		} else {
+			obs_log(LOG_ERROR, "ndi-server failed to create sender, error code %d", conn.error);
+		}
+	}
 	return;
 }
 
@@ -719,8 +735,9 @@ void ndi_output_rawvideo(void *data, video_data *frame)
 	if (o->ndi_sender) {
 		ndiLib->send_send_video_async_v2(o->ndi_sender, &video_frame);
 	}
+	pthread_mutex_lock(&o->ndi_sender_mutex);
 	if (o->server_conn.running && o->server_conn.sender_created) {
-		serialize_frame(NDIlib_frame_type_video, (const void *)&video_frame, o->server_conn.pReq->payload,
+		serialize_frame(NDIlib_frame_type_video, (const void *)&video_frame, (uint8_t*)o->server_conn.pReq->payload,
 				sizeof(o->server_conn.pReq->payload),true);
 		NDIlib_frame_type_e frame_received = NDIlib_frame_type_none;
 		NDIlib_video_frame_v2_t video_frame_test;
@@ -745,6 +762,7 @@ void ndi_output_rawvideo(void *data, video_data *frame)
 			return;
 		}
 	}
+	pthread_mutex_unlock(&o->ndi_sender_mutex);
 }
 
 void ndi_output_rawaudio(void *data, audio_data *frame)
@@ -814,19 +832,26 @@ void ndi_output_rawaudio(void *data, audio_data *frame)
 	if (o->ndi_sender) {
 		ndiLib->send_send_audio_v3(o->ndi_sender, &audio_frame);
 	}
-
-	if (o->server_conn.running && o->server_conn.sender_created) {
-		serialize_frame(NDIlib_frame_type_audio, (const void *)&audio_frame, o->server_conn.pReqA->payload,
-				sizeof(o->server_conn.pReqA->payload), true);
-		o->server_conn.pReqA->command = NDI_SEND_AUDIO_FRAME;
-		SetEvent(o->server_conn.hEvtCmdA);
-		DWORD w = WaitForSingleObject(o->server_conn.hEvtRspA, NDI_SERVER_WAIT);
-		if (w != WAIT_OBJECT_0) {
-			obs_log(LOG_ERROR, "Timed out waiting for ndi-server send audio");
-			destroy_ndi_server(o->server_conn);
-			return;
+	pthread_mutex_lock(&o->ndi_sender_mutex);
+	if (o->server_conn.running && o->server_conn.sender_created && o->server_conn.pReqA && o->server_conn.hEvtCmdA &&
+	    o->server_conn.hEvtRspA) {
+		size_t written = serialize_frame(NDIlib_frame_type_audio, (const void *)&audio_frame,
+						 (uint8_t *)o->server_conn.pReqA->payload,
+						 sizeof(o->server_conn.pReqA->payload), true);
+		if (written == 0) {
+			obs_log(LOG_ERROR, "serialize_frame failed (too large?)");
+		} else {
+			o->server_conn.pReqA->command = NDI_SEND_AUDIO_FRAME;
+			SetEvent(o->server_conn.hEvtCmdA);
+			DWORD w = WaitForSingleObject(o->server_conn.hEvtRspA, NDI_SERVER_WAIT);
+			if (w != WAIT_OBJECT_0) {
+				obs_log(LOG_ERROR, "Timed out waiting for ndi-server send audio frame");
+				destroy_ndi_server(o->server_conn);
+				// keep mutex held while modifying server_conn
+			}
 		}
 	}
+	pthread_mutex_unlock(&o->ndi_sender_mutex);
 }
 
 obs_output_info create_ndi_output_info()
