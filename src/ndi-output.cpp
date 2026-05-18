@@ -380,7 +380,10 @@ void ndi_output_rawvideo(void *data, video_data *frame)
 		video_frame.p_data = frame->data[0];
 		video_frame.line_stride_in_bytes = frame->linesize[0];
 	}
-
+	if (!video_frame.p_data)
+		return;
+	OBS_SYNC_DEBUG_LOG_VIDEO_TIME("NDI <- ndi_output", o->ndi_name, frame->timestamp,
+				      (uint8_t *)video_frame.p_data);
 	ndiLib->send_send_video_async_v2(o->ndi_sender, &video_frame);
 }
 
@@ -446,7 +449,10 @@ void ndi_output_rawaudio(void *data, audio_data *frame)
 	}
 
 	audio_frame.p_data = o->audio_conv_buffer;
-
+	if (!audio_frame.p_data)
+		return;
+	OBS_SYNC_DEBUG_LOG_AUDIO_TIME("NDI <- ndi_output", o->ndi_name, frame->timestamp, (float *)audio_frame.p_data,
+				      audio_frame.no_samples, audio_frame.sample_rate);
 	ndiLib->send_send_audio_v3(o->ndi_sender, &audio_frame);
 }
 

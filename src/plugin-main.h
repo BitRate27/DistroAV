@@ -20,6 +20,7 @@
 #include "config.h"
 #include "obs-support/qt_wrapper.hpp"
 #include "plugin-support.h"
+#include "obs-support/sync-debug.h"
 
 #include "obs-support/obs-app.hpp"
 
