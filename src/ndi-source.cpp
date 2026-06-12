@@ -1230,18 +1230,6 @@ void ndi_source_destroy(void *data)
 	obs_log(LOG_DEBUG, "'%s' -ndi_source_destroy(…)", obs_source_name);
 }
 
-uint32_t ndi_source_get_width(void *data)
-{
-	auto s = (ndi_source_t *)data;
-	return s->width;
-}
-
-uint32_t ndi_source_get_height(void *data)
-{
-	auto s = (ndi_source_t *)data;
-	return s->height;
-}
-
 obs_source_info create_ndi_source_info()
 {
 	// https://docs.obsproject.com/reference-sources#source-definition-structure-obs-source-info
@@ -1262,9 +1250,6 @@ obs_source_info create_ndi_source_info()
 	ndi_source_info.hide = ndi_source_hidden;
 	ndi_source_info.deactivate = ndi_source_deactivated;
 	ndi_source_info.destroy = ndi_source_destroy;
-
-	ndi_source_info.get_width = ndi_source_get_width;
-	ndi_source_info.get_height = ndi_source_get_height;
 
 	return ndi_source_info;
 }
