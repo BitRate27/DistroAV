@@ -1,21 +1,45 @@
+/******************************************************************************
+	Copyright (C) 2016-2024 DistroAV <contact@distroav.org>
+
+	This program is free software; you can redistribute it and/or
+	modify it under the terms of the GNU General Public License
+	as published by the Free Software Foundation; either version 2
+	of the License, or (at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program; if not, see <https://www.gnu.org/licenses/>.
+******************************************************************************/
+
 #include "sync-debug.h"
 #include <util/platform.h>
 #include <mutex>
 #include <utility>
 
-std::map<std::string, bool> audio_on_map;
-std::map<std::string, int64_t> audio_on_time_map;
-std::map<std::string, int64_t> audio_off_time_map;
-std::map<std::string, int> audio_sync_count_map;
-std::map<std::string, bool> white_on_map;
-std::map<std::string, int64_t> white_on_time_map;
-std::map<std::string, int64_t> white_off_time_map;
-std::map<std::string, int> video_sync_count_map;
+// Consolidated per-key state
+struct sync_key_state {
+	std::mutex mutex; // protects the fields below for this key
 
-// Per-key mutexes to protect access to the maps for each source/key
-static std::map<std::string, std::mutex> sync_mutex_map;
-// Guard to protect creation of per-key mutex entries
-static std::mutex sync_mutex_map_guard;
+	// audio state
+	bool audio_on = false;
+	int64_t audio_on_time = -1;
+	int64_t audio_off_time = -1;
+	int audio_sync_count = 0;
+
+	// white/video state
+	bool white_on = false;
+	int64_t white_on_time = -1;
+	int64_t white_off_time = -1;
+	int video_sync_count = 0;
+};
+
+static std::map<std::string, sync_key_state> key_state_map;
+// Guard to protect creation of per-key entries
+static std::mutex key_state_map_guard;
 
 int64_t sync_white_time(int64_t time, uint8_t *p_data)
 {
@@ -104,69 +128,33 @@ void sync_debug_log_video_time(const char *message, const char *source_ndi_name,
 {
 	std::string key = std::string(message) + " [" + std::string(source_ndi_name) + "]";
 
-	// Ensure a mutex exists for this key
+	// Ensure an entry exists for this key
 	{
-		std::lock_guard<std::mutex> g(sync_mutex_map_guard);
-		if (sync_mutex_map.find(key) == sync_mutex_map.end())
-			sync_mutex_map.try_emplace(key);
+		std::lock_guard<std::mutex> g(key_state_map_guard);
+		if (key_state_map.find(key) == key_state_map.end())
+			key_state_map.try_emplace(key);
 	}
 
 	// Lock the per-key mutex for the remainder of the function
-	std::unique_lock<std::mutex> key_lock(sync_mutex_map[key]);
+	sync_key_state &st = key_state_map[key];
+	std::unique_lock<std::mutex> key_lock(st.mutex);
 
-	bool *white_on = nullptr;
-	int64_t *white_on_time = nullptr;
-	int64_t *white_off_time = nullptr;
-	int *video_sync_count = nullptr;
-
-	auto wo = white_on_map.find(key);
-	if (wo == white_on_map.end()) {
-		white_on_map[key] = false;
-		white_on_time_map[key] = -1;
-		white_off_time_map[key] = -1;
-		video_sync_count_map[key] = 0;
-	}
-
-	white_on = &white_on_map[key];
-	white_on_time = &white_on_time_map[key];
-	white_off_time = &white_off_time_map[key];
-	video_sync_count = &video_sync_count_map[key];
-
-	bool *audio_on = nullptr;
-	int64_t *audio_on_time = nullptr;
-	int64_t *audio_off_time = nullptr;
-	int *audio_sync_count = nullptr;
-
-	auto ao = audio_on_map.find(key);
-	if (ao == audio_on_map.end()) {
-		audio_on_map[key] = false;
-		audio_on_time_map[key] = -1;
-		audio_off_time_map[key] = -1;
-		audio_sync_count_map[key] = 0;
-	}
-
-	audio_on = &audio_on_map[key];
-	audio_on_time = &audio_on_time_map[key];
-	audio_off_time = &audio_off_time_map[key];
-	audio_sync_count = &audio_sync_count_map[key];
 	int64_t white_time = sync_white_time(timestamp, data);
 
-	if (!*white_on && (white_time > 0)) {
-		*white_on = true;
-		if (*white_on_time != -1)
-			(*video_sync_count)++;
-		*white_on_time = white_time;
-		//obs_log(LOG_DEBUG,"%s White on at %lld",key.c_str(),white_on_time);
-	} else if (*white_on && (white_time == 0)) {
-		*white_off_time = timestamp;
-		*white_on = false;
-		//obs_log(LOG_DEBUG, "%s White off at %lld", key.c_str(), white_off_time);
-	} else if (*white_on_time == -1)
-		*white_on_time = 0;
+	if (!st.white_on && (white_time > 0)) {
+		st.white_on = true;
+		if (st.white_on_time != -1)
+			(st.video_sync_count)++;
+		st.white_on_time = white_time;
+	} else if (st.white_on && (white_time == 0)) {
+		st.white_off_time = timestamp;
+		st.white_on = false;
+	} else if (st.white_on_time == -1)
+		st.white_on_time = 0;
 
 	// Call sync_debug_log while holding the per-key lock to ensure consistent reads/writes
-	sync_debug_log(key.c_str(), timestamp, audio_on_time, audio_off_time, *audio_sync_count, white_on_time,
-		       white_off_time, *video_sync_count);
+	sync_debug_log(key.c_str(), timestamp, &st.audio_on_time, &st.audio_off_time, st.audio_sync_count,
+		       &st.white_on_time, &st.white_off_time, st.video_sync_count);
 }
 
 void sync_debug_log_audio_time(const char *message, const char *source_ndi_name, uint64_t timestamp, float *data,
@@ -174,70 +162,34 @@ void sync_debug_log_audio_time(const char *message, const char *source_ndi_name,
 {
 	std::string key = std::string(message) + " [" + std::string(source_ndi_name) + "]";
 
-	// Ensure a mutex exists for this key
+	// Ensure an entry exists for this key
 	{
-		std::lock_guard<std::mutex> g(sync_mutex_map_guard);
-		if (sync_mutex_map.find(key) == sync_mutex_map.end())
-			sync_mutex_map.try_emplace(key);
+		std::lock_guard<std::mutex> g(key_state_map_guard);
+		if (key_state_map.find(key) == key_state_map.end())
+			key_state_map.try_emplace(key);
 	}
 
 	// Lock the per-key mutex for the remainder of the function
-	std::unique_lock<std::mutex> key_lock(sync_mutex_map[key]);
+	sync_key_state &st = key_state_map[key];
+	std::unique_lock<std::mutex> key_lock(st.mutex);
 
-	bool *white_on = nullptr;
-	int64_t *white_on_time = nullptr;
-	int64_t *white_off_time = nullptr;
-	int *video_sync_count = nullptr;
-
-	auto wo = white_on_map.find(key);
-	if (wo == white_on_map.end()) {
-		white_on_map[key] = false;
-		white_on_time_map[key] = -1;
-		white_off_time_map[key] = -1;
-		video_sync_count_map[key] = 0;
-	}
-
-	white_on = &white_on_map[key];
-	white_on_time = &white_on_time_map[key];
-	white_off_time = &white_off_time_map[key];
-	video_sync_count = &video_sync_count_map[key];
-
-	bool *audio_on = nullptr;
-	int64_t *audio_on_time = nullptr;
-	int64_t *audio_off_time = nullptr;
-	int *audio_sync_count = nullptr;
-
-	auto ao = audio_on_map.find(key);
-	if (ao == audio_on_map.end()) {
-		audio_on_map[key] = false;
-		audio_on_time_map[key] = -1;
-		audio_off_time_map[key] = -1;
-		audio_sync_count_map[key] = 0;
-	}
-
-	audio_on = &audio_on_map[key];
-	audio_on_time = &audio_on_time_map[key];
-	audio_off_time = &audio_off_time_map[key];
-	audio_sync_count = &audio_sync_count_map[key];
 	int64_t audio_time = sync_audio_on_time(timestamp, data, no_samples, sample_rate);
 
-	if (!*audio_on && (audio_time > 0)) {
-		*audio_on = true;
-		if (*audio_on_time != -1)
-			(*audio_sync_count)++;
-		*audio_on_time = audio_time;
-		//obs_log(LOG_DEBUG, "%s Audio on at %lld", key.c_str(), audio_on_time);
-	} else if (*audio_on) {
+	if (!st.audio_on && (audio_time > 0)) {
+		st.audio_on = true;
+		if (st.audio_on_time != -1)
+			(st.audio_sync_count)++;
+		st.audio_on_time = audio_time;
+	} else if (st.audio_on) {
 		audio_time = sync_audio_off_time(timestamp, data, no_samples, sample_rate);
 		if (audio_time > 0) {
-			*audio_off_time = audio_time;
-			*audio_on = false;
-			//obs_log(LOG_DEBUG, "%s Audio off at %lld", key.c_str(), audio_off_time);
+			st.audio_off_time = audio_time;
+			st.audio_on = false;
 		}
-	} else if (*audio_on_time == -1)
-		*audio_on_time = 0;
+	} else if (st.audio_on_time == -1)
+		st.audio_on_time = 0;
 
 	// Call sync_debug_log while holding the per-key lock to ensure consistent reads/writes
-	sync_debug_log(key.c_str(), timestamp, audio_on_time, audio_off_time, *audio_sync_count, white_on_time,
-		       white_off_time, *video_sync_count);
+	sync_debug_log(key.c_str(), timestamp, &st.audio_on_time, &st.audio_off_time, st.audio_sync_count,
+		       &st.white_on_time, &st.white_off_time, st.video_sync_count);
 }
