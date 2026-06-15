@@ -30,7 +30,7 @@ void sync_debug_log_audio_time(const char *message, const char *source_ndi_name,
 
 // Uncomment to enable measuring audio and video time differences
 // using black/white frames and audio on white frames
-#define SYNC_DEBUG 1
+//#define SYNC_DEBUG 1
 #ifdef SYNC_DEBUG
 #define SYNC_DEBUG_LOG_VIDEO_TIME(message, source_ndi_name, timestamp, data)                              \
     if (data) sync_debug_log_video_time(message, source_ndi_name, timestamp, data)
