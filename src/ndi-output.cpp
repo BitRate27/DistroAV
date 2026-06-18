@@ -433,7 +433,7 @@ void ndi_output_rawaudio(void *data, audio_data *frame)
 	audio_frame.channel_stride_in_bytes = frame->frames * 4;
 	audio_frame.FourCC = NDIlib_FourCC_audio_type_FLTP;
 
-	const size_t data_size = audio_frame.no_channels * audio_frame.channel_stride_in_bytes;
+	const size_t data_size = (size_t)audio_frame.no_channels * (size_t)audio_frame.channel_stride_in_bytes;
 
 	if (data_size > o->audio_conv_buffer_size) {
 		obs_log(LOG_DEBUG, "ndi_output_rawaudio('%s'): growing audio_conv_buffer from %zu to %zu bytes",
