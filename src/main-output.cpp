@@ -38,7 +38,9 @@ QString main_output_last_error()
 void on_main_output_started(void *, calldata_t *)
 {
 	obs_log(LOG_DEBUG, "+on_main_output_started()");
-	Config::Current()->OutputEnabled = true;
+	auto config = Config::Current();
+	config->OutputEnabled = true;
+	config->Save();
 	obs_log(LOG_DEBUG, "-on_main_output_started()");
 	obs_log(LOG_INFO, "NDI Main Output started");
 }
@@ -46,7 +48,9 @@ void on_main_output_started(void *, calldata_t *)
 void on_main_output_stopped(void *, calldata_t *)
 {
 	obs_log(LOG_DEBUG, "+on_main_output_stopped()");
-	Config::Current()->OutputEnabled = false;
+	auto config = Config::Current();
+	config->OutputEnabled = false;
+	config->Save();
 	obs_log(LOG_DEBUG, "-on_main_output_stopped()");
 	obs_log(LOG_INFO, "NDI Main Output stopped");
 }
