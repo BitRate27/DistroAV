@@ -26,7 +26,7 @@ const char *test_output_getname(void *)
 	return "Test NDI Output";
 }
 
-void *test_output_create(obs_data_t *settings, obs_output_t *output)
+void *test_output_create(obs_data_t *, obs_output_t *output)
 {
 	auto o = (test_output_t *)bzalloc(sizeof(test_output_t));
 	o->output = output;
@@ -68,7 +68,7 @@ bool test_output_start(void *data)
 	return true;
 }
 
-void test_output_stop(void *data, uint64_t) {}
+void test_output_stop(void *, uint64_t) {}
 
 void test_output_destroy(void *data)
 {
@@ -76,7 +76,7 @@ void test_output_destroy(void *data)
 	bfree(o);
 }
 
-void test_output_rawvideo(void *data, video_data *frame) {}
+void test_output_rawvideo(void *, video_data *) {}
 
 obs_output_info create_test_output_info()
 {
