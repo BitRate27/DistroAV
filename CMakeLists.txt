@@ -81,6 +81,7 @@ target_sources(
     src/ndi-finder.h
     src/ndi-finder.cpp
     src/ndi-output.cpp
+    src/test-output.cpp
     src/ndi-source.cpp
     src/plugin-main.cpp
     src/plugin-main.h
