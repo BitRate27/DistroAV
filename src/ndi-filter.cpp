@@ -337,6 +337,8 @@ void ndi_sender_destroy(ndi_filter_t *filter)
 	}
 }
 
+extern void replace_invalid_filename_chars(QString *s); // defined in forms/output-settings.cpp
+
 void ndi_sender_create(ndi_filter_t *filter, obs_data_t *settings)
 {
 	bool allocating_settings = false;
@@ -362,6 +364,10 @@ void ndi_sender_create(ndi_filter_t *filter, obs_data_t *settings)
 	}
 
 	QString ndi_name = obs_data_get_string(settings, FLT_PROP_NAME);
+
+	// Replace any invalid filename characters in the original NDI name before saving it back to settings
+	replace_invalid_filename_chars(&ndi_name);
+	obs_data_set_string(settings, FLT_PROP_NAME, ndi_name.toUtf8().constData());
 
 	// Check the original template for tokens before any replacements are made,
 	// so injected source/filter names cannot trigger unintended token expansion.
@@ -389,6 +395,9 @@ void ndi_sender_create(ndi_filter_t *filter, obs_data_t *settings)
 			signal_handler_connect(sh, "rename", on_renamed, filter);
 		}
 	}
+
+	// Replace any invalid filename characters in the final NDI name
+	replace_invalid_filename_chars(&ndi_name);
 
 	QByteArray ndi_name_utf8 = ndi_name.toUtf8();
 
