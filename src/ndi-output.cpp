@@ -19,6 +19,7 @@
 #include "sync-debug.h"
 #include <util/threading.h>
 #include <chrono>
+#include <cstring>
 
 // #include "plugin-support.h"
 
@@ -254,6 +255,8 @@ bool ndi_output_start(void *data)
 	return o->started;
 }
 
+void ndi_output_stop(void *data, uint64_t);
+
 void ndi_output_update(void *data, obs_data_t *settings)
 {
 	auto o = (ndi_output_t *)data;
@@ -261,10 +264,35 @@ void ndi_output_update(void *data, obs_data_t *settings)
 	auto groups = obs_data_get_string(settings, "ndi_groups");
 	obs_log(LOG_DEBUG, "ndi_output_update(name='%s', groups='%s', ...)", name, groups);
 
+	// If the output is running, stop it so it can be recreated with the new settings.
+	bool ndi_output_running = o->started;
+
+	if (ndi_output_running) {
+		obs_log(LOG_DEBUG, "ndi_output_update: ndi_name/ndi_groups changed, stopping output to apply changes");
+		// Stop the output; timestamp argument not used here so pass0.
+		ndi_output_stop(o, 0);
+	}
+
 	o->ndi_name = name;
 	o->ndi_groups = groups;
 	o->uses_video = obs_data_get_bool(settings, "uses_video");
 	o->uses_audio = obs_data_get_bool(settings, "uses_audio");
+
+	auto outputName = obs_output_get_name(o->output);
+	if (outputName && std::strcmp(outputName, "NDI Main Output") == 0) {
+		auto config = Config::Current();
+		config->OutputName = o->ndi_name;
+		config->OutputGroups = o->ndi_groups;
+		config->Save();
+	} else if (outputName && std::strcmp(outputName, "NDI Preview Output") == 0) {
+		auto config = Config::Current();
+		config->PreviewOutputName = o->ndi_name;
+		config->PreviewOutputGroups = o->ndi_groups;
+		config->Save();
+	}
+
+	if (ndi_output_running && !o->started)
+		ndi_output_start(o);
 
 	obs_log(LOG_INFO, "NDI Output Updated. '%s'", name);
 	obs_log(LOG_DEBUG, "ndi_output_update(name='%s', groups='%s', uses_video='%s', uses_audio='%s')", name, groups,
