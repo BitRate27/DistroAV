@@ -61,8 +61,8 @@ OutputSettings::OutputSettings(QWidget *parent) : QDialog(parent), ui(new Ui::Ou
 
 	auto obsVersionCheckResult = is_version_supported(QT_TO_UTF8(obsVersion), PLUGIN_MIN_OBS_VERSION);
 	applyStatus(ui->labelReqObsStatus, obsVersionCheckResult,
-		 obsVersionCheckResult ? QString("OK (%1 ≥ %2)").arg(obsVersion, PLUGIN_MIN_OBS_VERSION)
-				 : QString("Too old (%1 < %2)").arg(obsVersion, PLUGIN_MIN_OBS_VERSION));
+		    obsVersionCheckResult ? QString("OK (%1 ≥ %2)").arg(obsVersion, PLUGIN_MIN_OBS_VERSION)
+					  : QString("Too old (%1 < %2)").arg(obsVersion, PLUGIN_MIN_OBS_VERSION));
 
 	// DistroAV Version Check
 	auto pluginVersionText = QString("%1 %2").arg(PLUGIN_DISPLAY_NAME, PLUGIN_VERSION);
@@ -94,13 +94,13 @@ OutputSettings::OutputSettings(QWidget *parent) : QDialog(parent), ui(new Ui::Ou
 	});
 
 	auto ndiVersionCheckResult = !ndiVersionShort.isEmpty() &&
-				 is_version_supported(QT_TO_UTF8(ndiVersionShort), PLUGIN_MIN_NDI_VERSION);
+				     is_version_supported(QT_TO_UTF8(ndiVersionShort), PLUGIN_MIN_NDI_VERSION);
 	applyStatus(ui->labelReqNdiStatus, ndiVersionCheckResult,
-		 ndiVersionCheckResult
-			 ? QString("OK (%1 ≥ %2)").arg(ndiVersionShort, PLUGIN_MIN_NDI_VERSION)
-			 : (ndiVersionShort.isEmpty()
-				 ? QString("Missing (need %1+)").arg(PLUGIN_MIN_NDI_VERSION)
-				 : QString("Too old (%1 < %2)").arg(ndiVersionShort, PLUGIN_MIN_NDI_VERSION)));
+		    ndiVersionCheckResult
+			    ? QString("OK (%1 ≥ %2)").arg(ndiVersionShort, PLUGIN_MIN_NDI_VERSION)
+			    : (ndiVersionShort.isEmpty()
+				       ? QString("Missing (need %1+)").arg(PLUGIN_MIN_NDI_VERSION)
+				       : QString("Too old (%1 < %2)").arg(ndiVersionShort, PLUGIN_MIN_NDI_VERSION)));
 
 	// DistroAV Section Logic
 	// Check For Update Button
@@ -109,7 +109,7 @@ OutputSettings::OutputSettings(QWidget *parent) : QDialog(parent), ui(new Ui::Ou
 		// TODO: Write our own.
 		QPointer<QProgressDialog> progressDialog =
 			new QProgressDialog(QTStr("NDIPlugin.Update.CheckingForUpdate.Text").arg(PLUGIN_DISPLAY_NAME),
-					 Str("NDIPlugin.Update.CheckingForUpdate.Cancel"),0,0, this);
+					    Str("NDIPlugin.Update.CheckingForUpdate.Cancel"), 0, 0, this);
 		progressDialog->setAttribute(Qt::WA_DeleteOnClose, true);
 		progressDialog->setWindowModality(Qt::WindowModal);
 		connect(progressDialog, &QProgressDialog::canceled, [progressDialog]() {
@@ -117,7 +117,7 @@ OutputSettings::OutputSettings(QWidget *parent) : QDialog(parent), ui(new Ui::Ou
 			progressDialog->close();
 		});
 		auto checking = updateCheckStart([this,
-					 progressDialog](const PluginUpdateInfo &pluginUpdateInfo) -> bool {
+						  progressDialog](const PluginUpdateInfo &pluginUpdateInfo) -> bool {
 			if (progressDialog != nullptr) {
 				progressDialog->close();
 			}
@@ -139,8 +139,8 @@ OutputSettings::OutputSettings(QWidget *parent) : QDialog(parent), ui(new Ui::Ou
 				auto errorText = QTStr("NDIPlugin.Update.CheckingForUpdate.Error.Text");
 				errorText += QString("<pre>%1</pre>").arg(errorData);
 
-				if (pluginUpdateInfo.httpStatusCode ==404 // Not Found
-				 || pluginUpdateInfo.httpStatusCode ==412 // Precondition Failed
+				if (pluginUpdateInfo.httpStatusCode == 404    // Not Found
+				    || pluginUpdateInfo.httpStatusCode == 412 // Precondition Failed
 				) {
 					// Only someone building and loading their own plugin should see this.
 					// This is effectively just a code comment to them/me in the UI.
@@ -159,12 +159,12 @@ If you are running a local build, don't forget to add your build info to the upd
 				}
 
 				QMessageBox::warning(this, Str("NDIPlugin.Update.CheckingForUpdate.Error.Title"),
-						 errorText);
+						     errorText);
 				return false;
 			}
 
 			if (pluginUpdateInfo.versionLatest <= pluginUpdateInfo.versionCurrent &&
-			 Config::UpdateForce <1) {
+			    Config::UpdateForce < 1) {
 				QMessageBox::information(
 					this, QTStr("NDIPlugin.Update.NoUpdateAvailable").arg(PLUGIN_DISPLAY_NAME),
 					QTStr("NDIPlugin.Update.YouAreUpToDate")
@@ -189,7 +189,7 @@ If you are running a local build, don't forget to add your build info to the upd
 		// debug or verbose (e.g. `--distroav-debug`).
 		auto testButton = new QPushButton("Test Release Notes (debug)", this);
 		testButton->setToolTip("Debug: show the update dialog with sample hostile releaseNotes "
-					 "(HTML / script injection attempts) to verify the markdown escape.");
+				       "(HTML / script injection attempts) to verify the markdown escape.");
 		ui->horizontalLayoutDistroAv->addWidget(testButton);
 		connect(testButton, &QPushButton::clicked, [] { showSampleUpdateDialog(); });
 	}
@@ -237,14 +237,14 @@ If you are running a local build, don't forget to add your build info to the upd
 		obs_log(LOG_DEBUG, "Install NDI button clicked");
 #if defined(Q_OS_MACOS)
 		const auto script = QString("tell application \"Terminal\"\n"
-						"activate\n"
-						"do script \"brew reinstall libndi && exit\"\n"
-						"end tell");
+					    "activate\n"
+					    "do script \"brew reinstall libndi && exit\"\n"
+					    "end tell");
 
 		if (!QProcess::startDetached("/usr/bin/osascript", QStringList() << "-e" << script)) {
 			QMessageBox::warning(this, QTStr("NDIPlugin.OneclickInstallError.Title"),
-						 QTStr("NDIPlugin.OneclickInstallError.Message") +
-						 QStringLiteral("brew reinstall libndi"));
+					     QTStr("NDIPlugin.OneclickInstallError.Message") +
+						     QStringLiteral("brew reinstall libndi"));
 		}
 #elif defined(Q_OS_WIN)
 		if (!QProcess::startDetached(
@@ -323,8 +323,8 @@ void OutputSettings::onFormAccepted()
 
 	if (mainSupported && config->OutputEnabled && !config->OutputName.isEmpty()) {
 		if ((last_config.OutputEnabled != config->OutputEnabled) ||
-		 (last_config.OutputName != config->OutputName) ||
-		 (last_config.OutputGroups != config->OutputGroups)) {
+		    (last_config.OutputName != config->OutputName) ||
+		    (last_config.OutputGroups != config->OutputGroups)) {
 			// The Output is supported and enabled, OutputName exists and a Name or GroupName has changed since last form submission
 			obs_log(LOG_INFO, "Initializing Main output");
 			main_output_init();
@@ -334,12 +334,12 @@ void OutputSettings::onFormAccepted()
 	}
 	if (config->PreviewOutputEnabled && !config->PreviewOutputName.isEmpty()) {
 		if ((last_config.PreviewOutputEnabled != config->PreviewOutputEnabled) ||
-		 (last_config.PreviewOutputName != config->PreviewOutputName) ||
-		 (last_config.PreviewOutputGroups != config->PreviewOutputGroups)) {
+		    (last_config.PreviewOutputName != config->PreviewOutputName) ||
+		    (last_config.PreviewOutputGroups != config->PreviewOutputGroups)) {
 			// The Preview Output is enabled, OutputName exists and a Name or GroupName has changed since last form submission
 			obs_log(LOG_INFO, "Initializing Preview output");
 			preview_output_init();
-		}		
+		}
 	} else {
 		preview_output_stop();
 	}
