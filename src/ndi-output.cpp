@@ -257,10 +257,19 @@ bool ndi_output_start(void *data)
 
 void ndi_output_stop(void *data, uint64_t);
 
+void replace_invalid_filename_chars(QString *s);
+
 void ndi_output_update(void *data, obs_data_t *settings)
 {
 	auto o = (ndi_output_t *)data;
 	auto name = obs_data_get_string(settings, "ndi_name");
+	// Replace invalid filename characters in the provided name and persist back to settings.
+	if (name) {
+		QString qname = QString::fromUtf8(name);
+		replace_invalid_filename_chars(&qname);
+		obs_data_set_string(settings, "ndi_name", QT_TO_UTF8(qname));
+		name = obs_data_get_string(settings, "ndi_name");
+	}
 	auto groups = obs_data_get_string(settings, "ndi_groups");
 	obs_log(LOG_DEBUG, "ndi_output_update(name='%s', groups='%s', ...)", name, groups);
 
