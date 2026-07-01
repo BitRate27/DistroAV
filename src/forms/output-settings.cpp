@@ -2,18 +2,18 @@
 /******************************************************************************
 	Copyright (C) 2016-2024 DistroAV <contact@distroav.org>
 
-	This program is free software; you can redistribute it and/or
-	modify it under the terms of the GNU General Public License
+ This program is free software; you can redistribute it and/or
+ modify it under the terms of the GNU General Public License
 	as published by the Free Software Foundation; either version 2
-	of the License, or (at your option) any later version.
+ of the License, or (at your option) any later version.
 
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
 	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
+ GNU General Public License for more details.
 
-	You should have received a copy of the GNU General Public License
-	along with this program; if not, see <https://www.gnu.org/licenses/>.
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, see <https://www.gnu.org/licenses/>.
 ******************************************************************************/
 
 #include "output-settings.h"
@@ -21,6 +21,7 @@
 #include "plugin-main.h"
 #include "main-output.h"
 #include "preview-output.h"
+#include "../network-monitor-dialog.h"
 #include "update.h"
 #include "../config-notifier.h"
 
@@ -32,6 +33,7 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QAbstractButton>
 
 OutputSettings::OutputSettings(QWidget *parent) : QDialog(parent), ui(new Ui::OutputSettings)
 {
@@ -39,7 +41,11 @@ OutputSettings::OutputSettings(QWidget *parent) : QDialog(parent), ui(new Ui::Ou
 
 	connect(ui->buttonBox, SIGNAL(accepted()), this, SLOT(onFormAccepted()));
 
-	// Listen for external config changes so the dialog can update while visible.
+	// Add an Apply button that applies changes but keeps the dialog open.
+	QAbstractButton *applyButton = ui->buttonBox->addButton(QDialogButtonBox::Apply);
+	connect(applyButton, &QAbstractButton::clicked, this, &OutputSettings::onFormAccepted);
+
+	// Listen for external config changes so the dialog can update while visible (eg. web-sockets).
 	connect(ConfigNotifier::instance(), &ConfigNotifier::configChanged, this, &OutputSettings::onConfigChanged);
 
 	// Requirements checks and status display
@@ -101,6 +107,15 @@ OutputSettings::OutputSettings(QWidget *parent) : QDialog(parent), ui(new Ui::Ou
 			    : (ndiVersionShort.isEmpty()
 				       ? QString("Missing (need %1+)").arg(PLUGIN_MIN_NDI_VERSION)
 				       : QString("Too old (%1 < %2)").arg(ndiVersionShort, PLUGIN_MIN_NDI_VERSION)));
+
+   auto *networkMonitorButton = new QPushButton(tr("Network Monitor"), this);
+	networkMonitorButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+	networkMonitorButton->adjustSize();
+	networkMonitorButton->setFixedWidth(networkMonitorButton->sizeHint().width());
+	ui->horizontalLayoutFooter->insertWidget(0, networkMonitorButton);
+	connect(networkMonitorButton, &QPushButton::clicked, this, []() {
+     open_network_monitor_dialog();
+	});
 
 	// DistroAV Section Logic
 	// Check For Update Button
@@ -211,21 +226,21 @@ If you are running a local build, don't forget to add your build info to the upd
 					QStringLiteral("brew reinstall --cask distroav/distroav/distroav"));
 		}
 #elif defined(Q_OS_WIN)
-		if (!QProcess::startDetached(
-				"cmd.exe",
-				QStringList()
-					<< "/c"
-					<< "start"
-					<< "cmd.exe"
-					<< "/c"
-					<< "winget install -e --id DistroAV.DistroAV --accept-package-agreements --accept-source-agreements || pause")) {
-			QMessageBox::warning(this, QTStr("NDIPlugin.OneclickInstallError.Title"),
-						 QTStr("NDIPlugin.OneclickInstallError.Message") + QStringLiteral("winget install -e --id DistroAV.DistroAV"));
-			obs_log(LOG_DEBUG, "Install DistroAV button: something went wrong");
-		}
+        if (!QProcess::startDetached(
+                "cmd.exe",
+                QStringList()
+                    << "/c"
+                    << "start"
+                    << "cmd.exe"
+                    << "/c"
+                    << "winget install -e --id DistroAV.DistroAV --accept-package-agreements --accept-source-agreements || pause")) {
+            QMessageBox::warning(this, QTStr("NDIPlugin.OneclickInstallError.Title"),
+                                  QTStr("NDIPlugin.OneclickInstallError.Message") + QStringLiteral("winget install -e --id DistroAV.DistroAV"));
+            obs_log(LOG_DEBUG, "Install DistroAV button: something went wrong");
+        }
 #else
-			QMessageBox::information(this, "Unsupported platform",
-						"Automatic DistroAV installation is currently only supported on Windows and macOS using the default installation methods.");
+        QMessageBox::information(this, "Unsupported platform",
+                                 "Automatic DistroAV installation is currently only supported on Windows and macOS using the default installation methods.");
 #endif
 	});
 
@@ -247,21 +262,21 @@ If you are running a local build, don't forget to add your build info to the upd
 						     QStringLiteral("brew reinstall libndi"));
 		}
 #elif defined(Q_OS_WIN)
-		if (!QProcess::startDetached(
-				"cmd.exe",
-				QStringList()
-					<< "/c"
-					<< "start"
-					<< "cmd.exe"
-					<< "/c"
-					<< "winget install -e --id NDI.NDIRuntime --accept-package-agreements --accept-source-agreements || pause")) {
-			QMessageBox::warning(this, QTStr("NDIPlugin.OneclickInstallError.Title"),
-						 QTStr("NDIPlugin.OneclickInstallError.Message") + QStringLiteral("winget install -e --id NDI.NDIRuntime"));
-			obs_log(LOG_DEBUG, "Install NDI button: something went wrong");
-		}
+        if (!QProcess::startDetached(
+                "cmd.exe",
+                QStringList()
+                    << "/c"
+                    << "start"
+                    << "cmd.exe"
+                    << "/c"
+                    << "winget install -e --id NDI.NDIRuntime --accept-package-agreements --accept-source-agreements || pause")) {
+            QMessageBox::warning(this, QTStr("NDIPlugin.OneclickInstallError.Title"),
+                                  QTStr("NDIPlugin.OneclickInstallError.Message") + QStringLiteral("winget install -e --id NDI.NDIRuntime"));
+            obs_log(LOG_DEBUG, "Install NDI button: something went wrong");
+        }
 #else
-		QMessageBox::information(this, "Unsupported platform",
-						 "Automatic NDI installation is currently only supported on Windows and macOS using the default installation methods.");
+        QMessageBox::information(this, "Unsupported platform",
+                                 "Automatic NDI installation is currently only supported on Windows and macOS using the default installation methods.");
 #endif
 	});
 
@@ -327,7 +342,7 @@ void OutputSettings::onFormAccepted()
 		    (last_config.OutputGroups != config->OutputGroups)) {
 			// The Output is supported and enabled, OutputName exists and a Name or GroupName has changed since last form submission
 			obs_log(LOG_INFO, "Initializing Main output");
-			main_output_init();
+			main_output_start();
 		}
 	} else {
 		main_output_stop();
@@ -338,7 +353,7 @@ void OutputSettings::onFormAccepted()
 		    (last_config.PreviewOutputGroups != config->PreviewOutputGroups)) {
 			// The Preview Output is enabled, OutputName exists and a Name or GroupName has changed since last form submission
 			obs_log(LOG_INFO, "Initializing Preview output");
-			preview_output_init();
+			preview_output_start();
 		}
 	} else {
 		preview_output_stop();
@@ -367,6 +382,11 @@ void OutputSettings::onConfigChanged()
 void OutputSettings::refreshUI()
 {
 	auto config = Config::Current();
+	auto applyStatus = [](QLabel *label, bool ok, const QString &) {
+		label->setText(QString::fromUtf8("%1").arg(ok ? "✓" : "✗"));
+		label->setStyleSheet(ok ? "QWidget { color: #2e7d32; padding:0; }"
+					: "QWidget { color: #c62828; padding:0; }");
+	};
 
 	// Enable Output (Main & Preview) settings as long as Main Output can be supported.
 
@@ -390,7 +410,16 @@ void OutputSettings::refreshUI()
 	ui->mainOutputGroupBox->setChecked(config->OutputEnabled);
 	ui->mainOutputName->setText(config->OutputName);
 	ui->mainOutputGroups->setText(config->OutputGroups);
+	auto mainSendInfo = network_monitor->getSenderInfo("NDI Main Output");
+	applyStatus(ui->mainOutputSending, mainSendInfo != nullptr, "S");
 
+	if (mainSendInfo) {
+		applyStatus(ui->mainOutputDiscoverable, mainSendInfo->is_discoverable(), "D");
+		applyStatus(ui->mainOutputReceiving, mainSendInfo->get_receivers() > 0, "R");
+	} else {
+		applyStatus(ui->mainOutputDiscoverable, false, "D");
+		applyStatus(ui->mainOutputReceiving, false, "R");
+	}
 	auto lastError = main_output_last_error();
 	ui->mainOutputLastError->setText(lastError);
 	if (lastError.isEmpty()) {
@@ -411,7 +440,16 @@ void OutputSettings::refreshUI()
 	ui->previewOutputGroupBox->setChecked(config->PreviewOutputEnabled);
 	ui->previewOutputName->setText(config->PreviewOutputName);
 	ui->previewOutputGroups->setText(config->PreviewOutputGroups);
+	auto previewSendInfo = network_monitor->getSenderInfo("NDI Preview Output");
+	applyStatus(ui->previewOutputSending, previewSendInfo != nullptr, "S");
 
+	if (previewSendInfo) {
+		applyStatus(ui->previewOutputDiscoverable, previewSendInfo->is_discoverable(), "D");
+		applyStatus(ui->previewOutputReceiving, previewSendInfo->get_receivers() > 0, "R");
+	} else {
+		applyStatus(ui->previewOutputDiscoverable, false, "D");
+		applyStatus(ui->previewOutputReceiving, false, "R");
+	}
 	ui->tallyProgramCheckBox->setChecked(config->TallyProgramEnabled);
 	ui->tallyPreviewCheckBox->setChecked(config->TallyPreviewEnabled);
 

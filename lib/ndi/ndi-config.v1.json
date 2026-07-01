@@ -1,0 +1,39 @@
+{
+  "ndi": {
+    "adapters": {
+      "allowed": []
+    },
+    "groups": {
+      "recv": "Public",
+      "send": "Public"
+    },
+    "machinename": "",
+    "multicast": {
+      "send": {
+        "enable": false,
+        "netmask": "255.255.0.0",
+        "netprefix": "239.255.0.0",
+        "ttl": 1
+      },
+      "recv": {
+        "enable": true,
+        "subnets": []
+      }
+    }, 
+    "rudp": {
+      "recv": {
+        "enable": true
+      }
+    },
+    "tcp": {
+      "recv": {
+        "enable": true
+      }
+    },
+    "unicast": {
+      "recv": {
+        "enable": true
+      }
+    }
+  }
+}

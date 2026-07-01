@@ -65,9 +65,9 @@ void on_preview_output_stopped(void *, calldata_t *)
 void preview_output_stop()
 {
 	obs_log(LOG_DEBUG, "+preview_output_stop()");
-	if (context.output) {
+	if ((context.output) && obs_output_active(context.output)) {
 		obs_log(LOG_DEBUG, "preview_output_stop: stopping NDI preview output '%s'",
-			QT_TO_UTF8(context.ndi_name));
+		QT_TO_UTF8(context.ndi_name));
 		obs_output_stop(context.output);
 
 		video_output_stop(context.video_queue);
@@ -76,6 +76,7 @@ void preview_output_stop()
 		obs_frontend_remove_event_callback(on_preview_scene_changed, &context);
 
 		obs_source_release(context.current_source);
+		context.current_source = nullptr;
 
 		obs_enter_graphics();
 		gs_stagesurface_destroy(context.stagesurface);
@@ -222,9 +223,6 @@ void preview_output_init()
 	auto output_name = config->PreviewOutputName;
 	auto output_groups = config->PreviewOutputGroups;
 	auto is_enabled = config->PreviewOutputEnabled;
-
-	if (context.output)
-		preview_output_close();
 
 	obs_log(LOG_DEBUG, "preview_output_init: creating NDI Preview Output '%s'", QT_TO_UTF8(output_name));
 	obs_data_t *output_settings = obs_data_create();
