@@ -16,7 +16,7 @@
 ******************************************************************************/
 
 #include <cstdint>
-#include <cstring>   // for memcmp - used by TestMulticastRoundTrip()
+#include <cstring> // for memcmp - used by TestMulticastRoundTrip()
 #include <vector>
 #include <string>
 #include <sstream>
@@ -130,7 +130,8 @@ static bool PortSpecCoversPort(const std::wstring &portsSpec, int port)
 	size_t pos = 0;
 	while (pos <= portsSpec.size()) {
 		size_t comma = portsSpec.find(L',', pos);
-		std::wstring token = portsSpec.substr(pos, comma == std::wstring::npos ? std::wstring::npos : comma - pos);
+		std::wstring token =
+			portsSpec.substr(pos, comma == std::wstring::npos ? std::wstring::npos : comma - pos);
 
 		size_t first = token.find_first_not_of(L" \t");
 		size_t last = token.find_last_not_of(L" \t");
@@ -226,7 +227,8 @@ static FirewallPortAccess PortAccessFromAccumulator(bool firewallEnabledForProfi
 // Printer Sharing, whose built-in rule group has no outbound rules at all
 // (see NdiAdapterInfo::filePrinterSharing), so requiring both directions
 // to agree would make it permanently report Blocked.
-static FirewallPortAccess InboundPortAccessFromAccumulator(bool firewallEnabledForProfile, const PortRuleAccumulator &acc)
+static FirewallPortAccess InboundPortAccessFromAccumulator(bool firewallEnabledForProfile,
+							   const PortRuleAccumulator &acc)
 {
 	if (!firewallEnabledForProfile)
 		return FirewallPortAccess::NotApplicable;
@@ -297,7 +299,7 @@ static std::map<NET_FW_PROFILE_TYPE2, PerProfileFirewallState> GetFirewallStateB
 	}
 
 	const NET_FW_PROFILE_TYPE2 profileTypes[] = {NET_FW_PROFILE2_DOMAIN, NET_FW_PROFILE2_PRIVATE,
-						       NET_FW_PROFILE2_PUBLIC};
+						     NET_FW_PROFILE2_PUBLIC};
 
 	for (NET_FW_PROFILE_TYPE2 profileType : profileTypes) {
 		PerProfileFirewallState state;
@@ -361,7 +363,7 @@ static std::map<NET_FW_PROFILE_TYPE2, PerProfileFirewallState> GetFirewallStateB
 		// enabled Block always overrides a matching Allow (see
 		// PortAccessFromAccumulator()).
 		NET_FW_RULE_DIRECTION direction;
-		NET_FW_ACTION action;  
+		NET_FW_ACTION action;
 		rule->get_Direction(&direction);
 		rule->get_Action(&action);
 
@@ -383,7 +385,8 @@ static std::map<NET_FW_PROFILE_TYPE2, PerProfileFirewallState> GetFirewallStateB
 				if (grouping && wcscmp(grouping, L"@FirewallAPI.dll,-28502") == 0) {
 					const bool isBlock = (action == NET_FW_ACTION_BLOCK);
 					for (NET_FW_PROFILE_TYPE2 profileType : profileTypes) {
-						if (ruleProfiles != NET_FW_PROFILE2_ALL && (ruleProfiles & profileType) == 0)
+						if (ruleProfiles != NET_FW_PROFILE2_ALL &&
+						    (ruleProfiles & profileType) == 0)
 							continue;
 						PortRuleAccumulator &acc = fileSharingAcc[profileType];
 						acc.inAllowed |= !isBlock;
@@ -490,7 +493,8 @@ static std::map<NET_FW_PROFILE_TYPE2, PerProfileFirewallState> GetFirewallStateB
 		const bool fwEnabled = result[profileType].firewallEnabled;
 		result[profileType].mdnsPortOpen = PortAccessFromAccumulator(fwEnabled, mdnsAcc[profileType]);
 		result[profileType].ndiPortsOpen = PortAccessFromAccumulator(fwEnabled, ndiAcc[profileType]);
-		result[profileType].filePrinterSharing = InboundPortAccessFromAccumulator(fwEnabled, fileSharingAcc[profileType]);
+		result[profileType].filePrinterSharing =
+			InboundPortAccessFromAccumulator(fwEnabled, fileSharingAcc[profileType]);
 	}
 
 	if (uninit)
@@ -591,8 +595,8 @@ static bool LooksVirtual(const std::string &desc, ULONG ifType)
 #elif defined(__linux__)
 	if (ifType == ARPHRD_LOOPBACK)
 		return true;
-	if (ifType == ARPHRD_TUNNEL || ifType == ARPHRD_TUNNEL6 || ifType == ARPHRD_SIT ||
-	    ifType == ARPHRD_IPGRE || ifType == ARPHRD_NONE) // ARPHRD_NONE: common for WireGuard, some VPNs
+	if (ifType == ARPHRD_TUNNEL || ifType == ARPHRD_TUNNEL6 || ifType == ARPHRD_SIT || ifType == ARPHRD_IPGRE ||
+	    ifType == ARPHRD_NONE) // ARPHRD_NONE: common for WireGuard, some VPNs
 		return true;
 #elif defined(__APPLE__)
 	if (ifType == IFT_LOOP)
@@ -614,10 +618,10 @@ static bool LooksVirtual(const std::string &desc, ULONG ifType)
 	// string like Windows provides), so we match against the naming
 	// conventions those platforms actually use for virtual/tunnel/
 	// container adapters.
-	return StringContainsAny(lower, {"virtual", "vmware", "vbox", "vnic", "vmnet", "vpn", "tailscale",
-					  "wireguard", "wg", "loopback", "veth", "docker", "bridge", "br-",
-					  "podman", "cni", "flannel", "utun", "tun", "tap", "ppp", "gif", "stf",
-					  "awdl", "llw", "teredo"});
+	return StringContainsAny(lower, {"virtual",   "vmware", "vbox",     "vnic", "vmnet",  "vpn",    "tailscale",
+					 "wireguard", "wg",     "loopback", "veth", "docker", "bridge", "br-",
+					 "podman",    "cni",    "flannel",  "utun", "tun",    "tap",    "ppp",
+					 "gif",       "stf",    "awdl",     "llw",  "teredo"});
 #endif
 }
 
@@ -1184,7 +1188,7 @@ static bool TestMulticastRoundTrip(int s, const std::string &adapterIp)
 
 		if (payload.size() == static_cast<size_t>(received) && memcmp(buf, payload.data(), received) == 0)
 			return true; // our own probe came back - the round trip succeeded
-		// else: not our packet - loop and keep waiting until the deadline
+				     // else: not our packet - loop and keep waiting until the deadline
 	}
 
 	return false;
@@ -1319,8 +1323,8 @@ bool GetSample(IF_LUID luid, NicSample &out)
 	out.transmitSpeed = speedBps;
 
 	out.timestampMs = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-							 std::chrono::steady_clock::now().time_since_epoch())
-							 .count());
+							std::chrono::steady_clock::now().time_since_epoch())
+							.count());
 	return true;
 }
 
@@ -1366,8 +1370,8 @@ bool GetSample(IF_LUID luid, NicSample &out)
 		return false;
 
 	out.timestampMs = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-							 std::chrono::steady_clock::now().time_since_epoch())
-							 .count());
+							std::chrono::steady_clock::now().time_since_epoch())
+							.count());
 	return true;
 }
 
@@ -1379,9 +1383,9 @@ void UpdateNicbps(std::vector<NdiAdapterInfo> &nics)
 	for (auto &nic : nics) {
 		// if (!nic.ndiCandidate)  // TODO: Look in config to see if it is set as a prefered NIC.
 		//	continue;
-		
+
 		NicSample prev, curr;
-		
+
 		prev = nic.lastSample;
 
 		if (GetSample(nic.luid, curr)) {
@@ -1459,28 +1463,25 @@ std::string FormatNdiNetworkReport(const NdiNetworkReport &report)
 	    << " | " << std::left << std::setw(COL_MASK) << "Subnet" << " | " << std::left << std::setw(COL_STATUS)
 	    << "Status" << " | " << std::left << std::setw(COL_NETCAT) << "Category" << " | " << std::left
 	    << std::setw(COL_MCAST) << "Mul" << " | " << std::left << std::setw(COL_JOIN) << "Joined" << " | "
-	    << std::left << std::setw(COL_RTRIP) << "RTrip" << " | " << std::left
-	    << std::setw(COL_VIRT) << "Vir" << " | " << std::left << std::setw(COL_FW) << "FW" << " | " << std::left
-	    << std::setw(COL_MDNSOPEN) << "mDNS" << " | " << std::left << std::setw(COL_PORTS) << "Ports" << " | "
-	    << std::left << std::setw(COL_FPSHARE) << "F&P Sharing" << " | " << std::left << std::setw(COL_DESC)
-	    << "Description"
-		 << " | " << std::left << std::setw(COL_INBPS) << "In Mbps"
-		 << " | " << std::left << std::setw(COL_OUTBPS) << "Out Mbps"
-		 << " | " << std::left << std::setw(COL_RSPEED) << "Rx Speed"
-	     << " | " << std::left << std::setw(COL_TSPEED) << "Tx Speed"
-		<< '\n';
+	    << std::left << std::setw(COL_RTRIP) << "RTrip" << " | " << std::left << std::setw(COL_VIRT) << "Vir"
+	    << " | " << std::left << std::setw(COL_FW) << "FW" << " | " << std::left << std::setw(COL_MDNSOPEN)
+	    << "mDNS" << " | " << std::left << std::setw(COL_PORTS) << "Ports" << " | " << std::left
+	    << std::setw(COL_FPSHARE) << "F&P Sharing" << " | " << std::left << std::setw(COL_DESC) << "Description"
+	    << " | " << std::left << std::setw(COL_INBPS) << "In Mbps"
+	    << " | " << std::left << std::setw(COL_OUTBPS) << "Out Mbps"
+	    << " | " << std::left << std::setw(COL_RSPEED) << "Rx Speed"
+	    << " | " << std::left << std::setw(COL_TSPEED) << "Tx Speed" << '\n';
 
 	// Separator line
-	out << std::string(COL_REC, '-') << "-+-" << std::string(COL_NAME, '-') << "-+-" << std::string(COL_TYPE, '-') << "-+-"
-	    << std::string(COL_IPV4, '-') << "-+-" << std::string(COL_MASK, '-') << "-+-"
+	out << std::string(COL_REC, '-') << "-+-" << std::string(COL_NAME, '-') << "-+-" << std::string(COL_TYPE, '-')
+	    << "-+-" << std::string(COL_IPV4, '-') << "-+-" << std::string(COL_MASK, '-') << "-+-"
 	    << std::string(COL_STATUS, '-') << "-+-" << std::string(COL_NETCAT, '-') << "-+-"
 	    << std::string(COL_MCAST, '-') << "-+-" << std::string(COL_JOIN, '-') << "-+-"
-	    << std::string(COL_RTRIP, '-') << "-+-"
-	    << std::string(COL_VIRT, '-') << "-+-" << std::string(COL_FW, '-') << "-+-"
-	    << std::string(COL_MDNSOPEN, '-') << "-+-" << std::string(COL_PORTS, '-') << "-+-"
+	    << std::string(COL_RTRIP, '-') << "-+-" << std::string(COL_VIRT, '-') << "-+-" << std::string(COL_FW, '-')
+	    << "-+-" << std::string(COL_MDNSOPEN, '-') << "-+-" << std::string(COL_PORTS, '-') << "-+-"
 	    << std::string(COL_FPSHARE, '-') << "-+-" << std::string(COL_DESC, '-') << "-+-"
 	    << std::string(COL_INBPS, '-') << "-+-" << std::string(COL_OUTBPS, '-') << "-+-"
-		<< std::string(COL_RSPEED, '-') << "-+-" << std::string(COL_TSPEED, '-') << '\n';
+	    << std::string(COL_RSPEED, '-') << "-+-" << std::string(COL_TSPEED, '-') << '\n';
 	for (const auto &a : report.adapters) {
 		// Format values and truncate as necessary to keep columns aligned
 		std::string rec = a.ndiCandidate ? "  *" : "   ";
@@ -1514,20 +1515,17 @@ std::string FormatNdiNetworkReport(const NdiNetworkReport &report)
 		std::string rspeed = truncate_for_column(formatBps(a.receiveSpeed).toUtf8().constData(), COL_RSPEED);
 		std::string tspeed = truncate_for_column(formatBps(a.transmitSpeed).toUtf8().constData(), COL_TSPEED);
 		out << std::left << std::setw(COL_REC) << rec << " | " << std::left << std::setw(COL_NAME) << name
-		    << " | "
-		    << std::left << std::setw(COL_TYPE) << type << " | " << std::left << std::setw(COL_IPV4) << ipv4
-		    << " | " << std::left << std::setw(COL_MASK) << mask << " | " << std::left << std::setw(COL_STATUS)
-		    << status << " | " << std::left << std::setw(COL_NETCAT) << netcat << " | " << std::left
-		    << std::setw(COL_MCAST) << mcast << " | " << std::left << std::setw(COL_JOIN) << join << " | "
-		    << std::left << std::setw(COL_RTRIP) << rtrip << " | "
-		    << std::left
-		    << std::setw(COL_VIRT) << virt << " | " << std::left << std::setw(COL_FW) << fw << " | "
-		    << std::left << std::setw(COL_MDNSOPEN) << mdnsOpen << " | " << std::left << std::setw(COL_PORTS)
-		    << portsOpen << " | " << std::left << std::setw(COL_FPSHARE) << fpShare << " | " << std::left
-		    << std::setw(COL_DESC) << desc
-			<< " | " << std::left << std::setw(COL_INBPS) << inBps << " | " << std::left << std::setw(COL_OUTBPS) << outBps
-			<< " | " << std::left << std::setw(COL_RSPEED) << rspeed << " | " << std::left << std::setw(COL_TSPEED) << tspeed
-		    << '\n';
+		    << " | " << std::left << std::setw(COL_TYPE) << type << " | " << std::left << std::setw(COL_IPV4)
+		    << ipv4 << " | " << std::left << std::setw(COL_MASK) << mask << " | " << std::left
+		    << std::setw(COL_STATUS) << status << " | " << std::left << std::setw(COL_NETCAT) << netcat << " | "
+		    << std::left << std::setw(COL_MCAST) << mcast << " | " << std::left << std::setw(COL_JOIN) << join
+		    << " | " << std::left << std::setw(COL_RTRIP) << rtrip << " | " << std::left << std::setw(COL_VIRT)
+		    << virt << " | " << std::left << std::setw(COL_FW) << fw << " | " << std::left
+		    << std::setw(COL_MDNSOPEN) << mdnsOpen << " | " << std::left << std::setw(COL_PORTS) << portsOpen
+		    << " | " << std::left << std::setw(COL_FPSHARE) << fpShare << " | " << std::left
+		    << std::setw(COL_DESC) << desc << " | " << std::left << std::setw(COL_INBPS) << inBps << " | "
+		    << std::left << std::setw(COL_OUTBPS) << outBps << " | " << std::left << std::setw(COL_RSPEED)
+		    << rspeed << " | " << std::left << std::setw(COL_TSPEED) << tspeed << '\n';
 	}
 
 	out << "\nmDNS / multicast discovery\n";

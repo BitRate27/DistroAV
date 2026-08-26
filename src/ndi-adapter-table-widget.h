@@ -50,10 +50,10 @@ public:
 		ColSubnetMask,
 		ColIsUp,
 		ColSupportsMulticast,
-        ColJoin,
-        ColRoundTrip,
+		ColJoin,
+		ColRoundTrip,
 		ColLooksVirtual,
-       ColNetworkCategory,
+		ColNetworkCategory,
 		ColFirewallEnabled,
 		ColMdnsPortOpen,
 		ColNdiPortsOpen,
@@ -110,7 +110,7 @@ private:
 	QTableView *m_tableView;
 	NdiAdapterTableModel *m_model;
 	QSortFilterProxyModel *m_proxyModel;
- ChangeNotifier *m_changeNotifier = nullptr;
+	ChangeNotifier *m_changeNotifier = nullptr;
 	QCheckBox *m_mdnsBindCheckBox = nullptr;
 	QCheckBox *m_mdnsPortCheckBox = nullptr;
 	QLabel *m_avahiStatusLabel = nullptr;

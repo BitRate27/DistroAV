@@ -527,7 +527,7 @@ void *ndi_source_thread(void *data)
 			if (ndi_frame_sync) {
 				obs_log(LOG_DEBUG, "'%s' ndi_source_thread: ndiLib->framesync_destroy(ndi_frame_sync)",
 					obs_source_name);
-				 ndiLib->framesync_destroy(ndi_frame_sync);
+				ndiLib->framesync_destroy(ndi_frame_sync);
 				ndi_frame_sync = nullptr;
 			}
 
@@ -716,13 +716,12 @@ void *ndi_source_thread(void *data)
 				1024); // "The desired sample count. 0 to get the source value."
 			uint64_t t1 = os_gettime_ns();
 
-
 			// Note: "This function will always return data immediately, inserting silence if no current audio data is present."
 			if (audio_frame.p_data && (audio_frame.timestamp > timestamp_audio)) {
 				timestamp_audio = audio_frame.timestamp;
 				// obs_log(LOG_DEBUG, "%s: New Audio Frame (Framesync ON): ts=%d tc=%d", obs_source_name, audio_frame.timestamp, audio_frame.timecode);
 				ndi_source_thread_process_audio3(&s->config, &audio_frame, s->obs_source,
-								 &obs_audio_frame);	
+								 &obs_audio_frame);
 				uint64_t t2 = os_gettime_ns();
 				if (s->ndi_receiver_info)
 					s->ndi_receiver_info->receive_audio_frame(t0, t1, t2, audio_frame);
@@ -808,7 +807,7 @@ void *ndi_source_thread(void *data)
 		if (ndiLib) {
 			obs_log(LOG_DEBUG, "'%s' ndi_source_thread: ndiLib->recv_destroy(ndi_receiver)",
 				obs_source_name);
-			network_monitor->setReceiver(s->obs_source,(NDIlib_recv_instance_t)nullptr);
+			network_monitor->setReceiver(s->obs_source, (NDIlib_recv_instance_t) nullptr);
 			ndiLib->recv_destroy(ndi_receiver);
 		}
 		obs_log(LOG_DEBUG, "'%s' ndi_source_thread: Reset NDI Receiver", obs_source_name);
@@ -1270,9 +1269,7 @@ void *ndi_source_create(obs_data_t *settings, obs_source_t *obs_source)
 
 	s->properties_dialog_open = std::make_shared<std::atomic<unsigned int>>(0u);
 	s->update_properties = {true};
-	s->change_notifier = new ChangeNotifier([s]() {
-		s->update_properties.store(true);
-	});
+	s->change_notifier = new ChangeNotifier([s]() { s->update_properties.store(true); });
 	s->ndi_receiver_info->registerChangeNotifier(s->change_notifier, "ndi-source");
 	ndi_source_update(s, settings);
 

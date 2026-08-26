@@ -91,19 +91,19 @@ QVariant NdiReceiverTableModel::data(const QModelIndex &index, int role) const
 	if (role == Qt::DisplayRole) {
 		auto report = r->getReportSnapshot();
 		switch (col) {
-     case ColObsSourceName:
+		case ColObsSourceName:
 			return QString::fromStdString(report.obs_source_name);
 		case ColNDIName:
 			return QString::fromStdString(r->get_ndi_name());
-     case ColVideoFramesDropped:
+		case ColVideoFramesDropped:
 			return QVariant((int)report.video_frames_dropped);
 		case ColVideoQueueDepth:
 			return QVariant((int)report.video_queue_size);
 		case ColFormatDescription:
 			return QString::fromStdString(report.format_description);
-       case ColOsFPS:
+		case ColOsFPS:
 			return QString::number(report.osFPS, 'f', 2);
-        case ColTsFPS:
+		case ColTsFPS:
 			return QString::number(report.tsFPS, 'f', 2);
 		case ColDeficitFPS:
 			return percentFromFraction(report.deficit_fps);
@@ -121,7 +121,7 @@ QVariant NdiReceiverTableModel::data(const QModelIndex &index, int role) const
 			return QVariant();
 		}
 	}
-    if (role == NdiReceiverSortRole) {
+	if (role == NdiReceiverSortRole) {
 		auto report = r->getReportSnapshot();
 		switch (col) {
 		case ColObsSourceName:
@@ -149,7 +149,7 @@ QVariant NdiReceiverTableModel::data(const QModelIndex &index, int role) const
 		case ColBudgetUsedPerFrameProcessing:
 			return QVariant(report.budget_used_per_frame_processing);
 		case ColAvDriftMsPerHour:
-			return QVariant(report.av_drift_ns_per_hour/1000000.0);
+			return QVariant(report.av_drift_ns_per_hour / 1000000.0);
 		default:
 			return QVariant();
 		}
@@ -157,7 +157,7 @@ QVariant NdiReceiverTableModel::data(const QModelIndex &index, int role) const
 	if (role == Qt::TextAlignmentRole) {
 		switch (index.column()) {
 		case ColVideoFramesDropped:
-        case ColVideoQueueDepth:
+		case ColVideoQueueDepth:
 		case ColOsFPS:
 		case ColTsFPS:
 		case ColDeficitFPS:
@@ -179,12 +179,12 @@ QVariant NdiReceiverTableModel::headerData(int section, Qt::Orientation orientat
 	if (orientation != Qt::Horizontal || role != Qt::DisplayRole)
 		return QAbstractTableModel::headerData(section, orientation, role);
 	switch (section) {
- case ColObsSourceName:
+	case ColObsSourceName:
 		return QStringLiteral("OBS Source Name");
 	case ColNDIName:
-      return QStringLiteral("NDI Name");
+		return QStringLiteral("NDI Name");
 	case ColVideoFramesDropped:
-       return QStringLiteral("Dropped");
+		return QStringLiteral("Dropped");
 	case ColVideoQueueDepth:
 		return QStringLiteral("Queued");
 	case ColFormatDescription:
@@ -235,7 +235,7 @@ NdiReceiverTableWidget::NdiReceiverTableWidget(QWidget *parent)
 	m_tableView->setAlternatingRowColors(true);
 	m_tableView->verticalHeader()->setVisible(false);
 	m_tableView->setSortingEnabled(true);
-    m_tableView->sortByColumn(NdiReceiverTableModel::ColObsSourceName, Qt::AscendingOrder);
+	m_tableView->sortByColumn(NdiReceiverTableModel::ColObsSourceName, Qt::AscendingOrder);
 
 	QHeaderView *header = m_tableView->horizontalHeader();
 	header->setSectionsMovable(true);

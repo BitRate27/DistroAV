@@ -46,7 +46,7 @@ struct NDIReceiverStats {
 	int64_t av_drift_ns = 0; // current selected/output-style A/V projected drift
 	int64_t av_drift_min_ns = std::numeric_limits<int64_t>::infinity();
 	int64_t av_drift_max_ns = std::numeric_limits<int64_t>::lowest();
-	double av_drift_ns_per_hour = 0.0; 
+	double av_drift_ns_per_hour = 0.0;
 
 	uint64_t last_video_frame_timestamp = 0;
 	uint64_t last_video_frame_os = 0;
@@ -56,7 +56,7 @@ struct NDIReceiverStats {
 	double osFPS = 0.;
 	double deficit_fps = 0.0;                      // fraction of target FPS that was not achieved
 	double deficit_sps = 0.0;                      // fraction of target SPS that was not achieved
-	double budget_used_per_frame_capture = 0.0;   // fraction of time spent in send per frame on average
+	double budget_used_per_frame_capture = 0.0;    // fraction of time spent in send per frame on average
 	double budget_used_per_frame_processing = 0.0; // fraction of time spent in processing per frame on average
 
 	size_t audio_sample_count = 0;
@@ -71,9 +71,9 @@ struct NDIReceiverStats {
 	uint64_t max_frame_interval = 0; // worst-case in window
 	uint64_t avg_frame_interval = 0; // rolling avg of callback deltas
 	double jitter_ratio = 0.0;
-	uint64_t tot_video_capture = 0;  // time inside NDIlib_receive_capture_video_*
+	uint64_t tot_video_capture = 0; // time inside NDIlib_receive_capture_video_*
 	uint64_t max_video_capture = 0;
-	uint64_t avg_video_capture = 0; // rolling avg of video capture times
+	uint64_t avg_video_capture = 0;    // rolling avg of video capture times
 	uint64_t tot_video_processing = 0; // time inside NDIlib_receive_capture_video_*
 	uint64_t max_video_processing = 0;
 	uint64_t avg_video_processing = 0; // rolling avg of video processing times

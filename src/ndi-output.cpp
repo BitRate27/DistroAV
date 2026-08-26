@@ -237,14 +237,15 @@ bool ndi_output_start(void *data)
 		o->started = obs_output_begin_data_capture(o->output, flags);
 		if (o->started) {
 			obs_log(LOG_INFO, "NDI Output started successfully. '%s'", name);
-			obs_log(LOG_DEBUG, "'%s' ndi_output_start: ndi output started", name);	
+			obs_log(LOG_DEBUG, "'%s' ndi_output_start: ndi output started", name);
 			o->ndi_sender_change_notifier = new ChangeNotifier([o]() {
 				obs_log(LOG_DEBUG, "NDI Output status changed - '%s'", o->ndi_name);
 				// Notify any Qt UI/listeners that the configuration has changed so they can refresh.
 				ConfigNotifier::instance();
 				emit ConfigNotifier::instance() -> configChanged();
-				});
-			o->ndi_sender_info = network_monitor->registerSender(o->ndi_sender, obs_output_get_name(o->output));
+			});
+			o->ndi_sender_info =
+				network_monitor->registerSender(o->ndi_sender, obs_output_get_name(o->output));
 			o->ndi_sender_info->set_ndi_name(o->ndi_name);
 			o->ndi_sender_info->registerChangeNotifier(o->ndi_sender_change_notifier, "ndi-output");
 		} else {
@@ -328,8 +329,8 @@ void ndi_output_stop(void *data, uint64_t)
 
 		if (o->ndi_sender) {
 			obs_log(LOG_DEBUG, "ndi_output_stop: +ndiLib->send_destroy(o->ndi_sender)");
-			pthread_mutex_lock(&o->ndi_sender_mutex);			
-			o->ndi_sender_info = nullptr;			
+			pthread_mutex_lock(&o->ndi_sender_mutex);
+			o->ndi_sender_info = nullptr;
 			network_monitor->unregisterSender(o->ndi_sender);
 			if (o->ndi_sender_change_notifier) {
 				delete o->ndi_sender_change_notifier;
@@ -482,7 +483,7 @@ void ndi_output_rawaudio(void *data, audio_data *frame)
 	audio_frame.p_data = o->audio_conv_buffer;
 	SYNC_DEBUG_LOG_AUDIO_TIME("NDI <- ndi_output", o->ndi_name, audio_frame.timestamp * 100,
 				  (float *)audio_frame.p_data, audio_frame.no_samples, audio_frame.sample_rate);
-	
+
 	uint64_t t1 = os_gettime_ns();
 	ndiLib->send_send_audio_v3(local_ndi_sender, &audio_frame);
 	uint64_t t2 = os_gettime_ns();

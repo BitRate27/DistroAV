@@ -83,17 +83,17 @@ namespace {
 QString defaultConfigPath()
 {
 #if defined(Q_OS_WIN)
-    QString programData = qEnvironmentVariable("ProgramData", "C:/ProgramData");
-    return programData + "/NDI/ndi-config.v1.json";
+	QString programData = qEnvironmentVariable("ProgramData", "C:/ProgramData");
+	return programData + "/NDI/ndi-config.v1.json";
 #else
-    const QString home = QDir::homePath();
-    const QString modern = home + "/.ndi/ndi-config.v1.json";
-    if (QFile::exists(modern))
-        return modern;
-    const QString legacy = home + "/.newtek/ndi-config.v1.json";
-    if (QFile::exists(legacy))
-        return legacy;
-    return modern; // fall back to the modern path even if it doesn't exist yet
+	const QString home = QDir::homePath();
+	const QString modern = home + "/.ndi/ndi-config.v1.json";
+	if (QFile::exists(modern))
+		return modern;
+	const QString legacy = home + "/.newtek/ndi-config.v1.json";
+	if (QFile::exists(legacy))
+		return legacy;
+	return modern; // fall back to the modern path even if it doesn't exist yet
 #endif
 }
 
@@ -101,284 +101,283 @@ QString defaultConfigPath()
 
 QJsonObject childObj(const QJsonObject &parent, const QString &key)
 {
-    return parent.value(key).toObject();
+	return parent.value(key).toObject();
 }
 
 // Walk/create a chain of nested objects and set the final value, leaving
 // every sibling key untouched. path = {"ndi","multicast","send","ttl"}
 void setJsonPath(QJsonObject &root, const QStringList &path, const QJsonValue &value)
 {
-    if (path.isEmpty())
-        return;
-    if (path.size() == 1) {
-        root[path.first()] = value;
-        return;
-    }
-    QJsonObject nested = root.value(path.first()).toObject();
-    QStringList rest = path;
-    rest.removeFirst();
-    setJsonPath(nested, rest, value);
-    root[path.first()] = nested;
+	if (path.isEmpty())
+		return;
+	if (path.size() == 1) {
+		root[path.first()] = value;
+		return;
+	}
+	QJsonObject nested = root.value(path.first()).toObject();
+	QStringList rest = path;
+	rest.removeFirst();
+	setJsonPath(nested, rest, value);
+	root[path.first()] = nested;
 }
 
 } // namespace
 
 // ---- Main widget ---------------------------------------------------------
 
-class NdiNetworkConfigWidget : public QWidget
-{
+class NdiNetworkConfigWidget : public QWidget {
 public:
-    explicit NdiNetworkConfigWidget(QString configPath, QWidget *parent = nullptr)
-        : QWidget(parent), m_configPath(std::move(configPath))
-    {
-        buildUi();
-        loadFromDisk();
-    }
+	explicit NdiNetworkConfigWidget(QString configPath, QWidget *parent = nullptr)
+		: QWidget(parent),
+		  m_configPath(std::move(configPath))
+	{
+		buildUi();
+		loadFromDisk();
+	}
 
 private:
-    // Widgets - one per field, each typed for what it actually represents.
-    QLabel *m_pathLabel = nullptr;
-    QLabel *m_statusLabel = nullptr;
+	// Widgets - one per field, each typed for what it actually represents.
+	QLabel *m_pathLabel = nullptr;
+	QLabel *m_statusLabel = nullptr;
 
-    QLineEdit *m_machineName = nullptr;
+	QLineEdit *m_machineName = nullptr;
 
-    QLineEdit *m_groupsSend = nullptr;
-    QLineEdit *m_groupsRecv = nullptr;
+	QLineEdit *m_groupsSend = nullptr;
+	QLineEdit *m_groupsRecv = nullptr;
 
-    QLineEdit *m_extraIps = nullptr;
-    QLineEdit *m_discoveryServer = nullptr;
+	QLineEdit *m_extraIps = nullptr;
+	QLineEdit *m_discoveryServer = nullptr;
 
-    QCheckBox *m_tcpRecvEnable = nullptr;
-    QCheckBox *m_unicastRecvEnable = nullptr;
-    QCheckBox *m_rudpRecvEnable = nullptr;
+	QCheckBox *m_tcpRecvEnable = nullptr;
+	QCheckBox *m_unicastRecvEnable = nullptr;
+	QCheckBox *m_rudpRecvEnable = nullptr;
 
-    QCheckBox *m_multicastEnable = nullptr;
-    QSpinBox  *m_multicastTtl = nullptr;
-    QLineEdit *m_multicastNetmask = nullptr;
-    QLineEdit *m_multicastNetprefix = nullptr;
+	QCheckBox *m_multicastEnable = nullptr;
+	QSpinBox *m_multicastTtl = nullptr;
+	QLineEdit *m_multicastNetmask = nullptr;
+	QLineEdit *m_multicastNetprefix = nullptr;
 
-    QListWidget *m_allowedAdapters = nullptr;
+	QListWidget *m_allowedAdapters = nullptr;
 
-    QString m_configPath;
-    QJsonObject m_rootJson; // full document, so unrelated keys survive a save
+	QString m_configPath;
+	QJsonObject m_rootJson; // full document, so unrelated keys survive a save
 
-    static QLineEdit *ipv4LineEdit(QWidget *parent = nullptr)
-    {
-        auto *edit = new QLineEdit(parent);
-        static const QRegularExpression ipRe(
-            R"(^(\d{1,3}\.){3}\d{1,3}$)");
-        edit->setValidator(new QRegularExpressionValidator(ipRe, edit));
-        edit->setPlaceholderText("e.g. 255.255.0.0");
-        return edit;
-    }
+	static QLineEdit *ipv4LineEdit(QWidget *parent = nullptr)
+	{
+		auto *edit = new QLineEdit(parent);
+		static const QRegularExpression ipRe(R"(^(\d{1,3}\.){3}\d{1,3}$)");
+		edit->setValidator(new QRegularExpressionValidator(ipRe, edit));
+		edit->setPlaceholderText("e.g. 255.255.0.0");
+		return edit;
+	}
 
-    void buildUi()
-    {
-        auto *root = new QVBoxLayout(this);
+	void buildUi()
+	{
+		auto *root = new QVBoxLayout(this);
 
-        // -- header: which file we're looking at --
-        m_pathLabel = new QLabel(this);
-        m_pathLabel->setWordWrap(true);
-        m_pathLabel->setStyleSheet("font-weight: 600;");
-        root->addWidget(m_pathLabel);
+		// -- header: which file we're looking at --
+		m_pathLabel = new QLabel(this);
+		m_pathLabel->setWordWrap(true);
+		m_pathLabel->setStyleSheet("font-weight: 600;");
+		root->addWidget(m_pathLabel);
 
-        auto *columns = new QHBoxLayout();
-        root->addLayout(columns);
+		auto *columns = new QHBoxLayout();
+		root->addLayout(columns);
 
-        auto *leftCol = new QVBoxLayout();
-        auto *rightCol = new QVBoxLayout();
-        columns->addLayout(leftCol, 1);
-        columns->addLayout(rightCol, 1);
+		auto *leftCol = new QVBoxLayout();
+		auto *rightCol = new QVBoxLayout();
+		columns->addLayout(leftCol, 1);
+		columns->addLayout(rightCol, 1);
 
-        // -- Identity --
-        auto *identityBox = new QGroupBox("Machine Identity", this);
-        auto *identityForm = new QFormLayout(identityBox);
-        m_machineName = new QLineEdit(identityBox);
-        m_machineName->setPlaceholderText("(use system hostname)");
-        m_machineName->setReadOnly(true);
-        identityForm->addRow("Machine name override:", m_machineName);
-        leftCol->addWidget(identityBox);
+		// -- Identity --
+		auto *identityBox = new QGroupBox("Machine Identity", this);
+		auto *identityForm = new QFormLayout(identityBox);
+		m_machineName = new QLineEdit(identityBox);
+		m_machineName->setPlaceholderText("(use system hostname)");
+		m_machineName->setReadOnly(true);
+		identityForm->addRow("Machine name override:", m_machineName);
+		leftCol->addWidget(identityBox);
 
-        // -- Groups --
-        auto *groupsBox = new QGroupBox("Groups", this);
-        auto *groupsForm = new QFormLayout(groupsBox);
-        m_groupsSend = new QLineEdit(groupsBox);
-        m_groupsSend->setPlaceholderText("Public,");
-        m_groupsSend->setReadOnly(true);
-        m_groupsRecv = new QLineEdit(groupsBox);
-        m_groupsRecv->setPlaceholderText("Public,");
-        m_groupsRecv->setReadOnly(true);
-        groupsForm->addRow("Send groups:", m_groupsSend);
-        groupsForm->addRow("Receive groups:", m_groupsRecv);
-        leftCol->addWidget(groupsBox);
+		// -- Groups --
+		auto *groupsBox = new QGroupBox("Groups", this);
+		auto *groupsForm = new QFormLayout(groupsBox);
+		m_groupsSend = new QLineEdit(groupsBox);
+		m_groupsSend->setPlaceholderText("Public,");
+		m_groupsSend->setReadOnly(true);
+		m_groupsRecv = new QLineEdit(groupsBox);
+		m_groupsRecv->setPlaceholderText("Public,");
+		m_groupsRecv->setReadOnly(true);
+		groupsForm->addRow("Send groups:", m_groupsSend);
+		groupsForm->addRow("Receive groups:", m_groupsRecv);
+		leftCol->addWidget(groupsBox);
 
-        // -- Networks / discovery --
-        auto *networksBox = new QGroupBox("Networks && Discovery", this);
-        auto *networksForm = new QFormLayout(networksBox);
-        m_extraIps = new QLineEdit(networksBox);
-        m_extraIps->setPlaceholderText("192.168.1.20,192.168.1.21");
-        m_extraIps->setReadOnly(true);
-        m_discoveryServer = new QLineEdit(networksBox);
-        m_discoveryServer->setPlaceholderText("(none)");
-        m_discoveryServer->setReadOnly(true);
-        networksForm->addRow("Extra IPs to discover:", m_extraIps);
-        networksForm->addRow("Discovery server:", m_discoveryServer);
-        leftCol->addWidget(networksBox);
+		// -- Networks / discovery --
+		auto *networksBox = new QGroupBox("Networks && Discovery", this);
+		auto *networksForm = new QFormLayout(networksBox);
+		m_extraIps = new QLineEdit(networksBox);
+		m_extraIps->setPlaceholderText("192.168.1.20,192.168.1.21");
+		m_extraIps->setReadOnly(true);
+		m_discoveryServer = new QLineEdit(networksBox);
+		m_discoveryServer->setPlaceholderText("(none)");
+		m_discoveryServer->setReadOnly(true);
+		networksForm->addRow("Extra IPs to discover:", m_extraIps);
+		networksForm->addRow("Discovery server:", m_discoveryServer);
+		leftCol->addWidget(networksBox);
 
-        // -- Connection modes --
-        auto *modesBox = new QGroupBox("Connection Modes", this);
-        auto *modesForm = new QFormLayout(modesBox);
-        m_tcpRecvEnable = new QCheckBox("Allow TCP receive", modesBox);
-        m_tcpRecvEnable->setEnabled(false);
-        m_unicastRecvEnable = new QCheckBox("Allow unicast UDP receive", modesBox);
-        m_unicastRecvEnable->setEnabled(false);
-        m_rudpRecvEnable = new QCheckBox("Allow RUDP receive", modesBox);
-        m_rudpRecvEnable->setEnabled(false);
-        modesForm->addRow(m_tcpRecvEnable);
-        modesForm->addRow(m_unicastRecvEnable);
-        modesForm->addRow(m_rudpRecvEnable);
-        leftCol->addWidget(modesBox);
-        leftCol->addStretch(1);
+		// -- Connection modes --
+		auto *modesBox = new QGroupBox("Connection Modes", this);
+		auto *modesForm = new QFormLayout(modesBox);
+		m_tcpRecvEnable = new QCheckBox("Allow TCP receive", modesBox);
+		m_tcpRecvEnable->setEnabled(false);
+		m_unicastRecvEnable = new QCheckBox("Allow unicast UDP receive", modesBox);
+		m_unicastRecvEnable->setEnabled(false);
+		m_rudpRecvEnable = new QCheckBox("Allow RUDP receive", modesBox);
+		m_rudpRecvEnable->setEnabled(false);
+		modesForm->addRow(m_tcpRecvEnable);
+		modesForm->addRow(m_unicastRecvEnable);
+		modesForm->addRow(m_rudpRecvEnable);
+		leftCol->addWidget(modesBox);
+		leftCol->addStretch(1);
 
-        // -- Multicast --
-        auto *multicastBox = new QGroupBox("Multicast (send)", this);
-        auto *multicastForm = new QFormLayout(multicastBox);
-        m_multicastEnable = new QCheckBox("Enable multicast send", multicastBox);
-        m_multicastEnable->setEnabled(false);
-        m_multicastTtl = new QSpinBox(multicastBox);
-        m_multicastTtl->setRange(0, 255);
-        m_multicastTtl->setEnabled(false);
-        m_multicastNetmask = ipv4LineEdit(multicastBox);
-        m_multicastNetmask->setReadOnly(true);
-        m_multicastNetprefix = ipv4LineEdit(multicastBox);
-        m_multicastNetprefix->setReadOnly(true);
-        multicastForm->addRow(m_multicastEnable);
-        multicastForm->addRow("TTL:", m_multicastTtl);
-        multicastForm->addRow("Netmask:", m_multicastNetmask);
-        multicastForm->addRow("Net prefix:", m_multicastNetprefix);
-        rightCol->addWidget(multicastBox);
+		// -- Multicast --
+		auto *multicastBox = new QGroupBox("Multicast (send)", this);
+		auto *multicastForm = new QFormLayout(multicastBox);
+		m_multicastEnable = new QCheckBox("Enable multicast send", multicastBox);
+		m_multicastEnable->setEnabled(false);
+		m_multicastTtl = new QSpinBox(multicastBox);
+		m_multicastTtl->setRange(0, 255);
+		m_multicastTtl->setEnabled(false);
+		m_multicastNetmask = ipv4LineEdit(multicastBox);
+		m_multicastNetmask->setReadOnly(true);
+		m_multicastNetprefix = ipv4LineEdit(multicastBox);
+		m_multicastNetprefix->setReadOnly(true);
+		multicastForm->addRow(m_multicastEnable);
+		multicastForm->addRow("TTL:", m_multicastTtl);
+		multicastForm->addRow("Netmask:", m_multicastNetmask);
+		multicastForm->addRow("Net prefix:", m_multicastNetprefix);
+		rightCol->addWidget(multicastBox);
 
-        // -- Adapters --
-        auto *adaptersBox = new QGroupBox("Allowed Network Adapters (IPs)", this);
-        auto *adaptersLayout = new QVBoxLayout(adaptersBox);
-        m_allowedAdapters = new QListWidget(adaptersBox);
-        // Make list read-only (no editing of items)
-        m_allowedAdapters->setEditTriggers(QAbstractItemView::NoEditTriggers);
-        adaptersLayout->addWidget(m_allowedAdapters);
+		// -- Adapters --
+		auto *adaptersBox = new QGroupBox("Allowed Network Adapters (IPs)", this);
+		auto *adaptersLayout = new QVBoxLayout(adaptersBox);
+		m_allowedAdapters = new QListWidget(adaptersBox);
+		// Make list read-only (no editing of items)
+		m_allowedAdapters->setEditTriggers(QAbstractItemView::NoEditTriggers);
+		adaptersLayout->addWidget(m_allowedAdapters);
 
-        rightCol->addWidget(adaptersBox);
-        rightCol->addStretch(1);
+		rightCol->addWidget(adaptersBox);
+		rightCol->addStretch(1);
 
-        // -- footer: reload / save / status --
-        auto *line = new QFrame(this);
-        line->setFrameShape(QFrame::HLine);
-        root->addWidget(line);
+		// -- footer: reload / save / status --
+		auto *line = new QFrame(this);
+		line->setFrameShape(QFrame::HLine);
+		root->addWidget(line);
 
-        auto *footer = new QHBoxLayout();
-        auto *reloadBtn = new QPushButton("Reload from Disk", this);
+		auto *footer = new QHBoxLayout();
+		auto *reloadBtn = new QPushButton("Reload from Disk", this);
 
-        m_statusLabel = new QLabel(this);
-        m_statusLabel->setStyleSheet("color: #666;");
-        footer->addWidget(reloadBtn);
-        footer->addStretch(1);
-        footer->addWidget(m_statusLabel);
-        root->addLayout(footer);
+		m_statusLabel = new QLabel(this);
+		m_statusLabel->setStyleSheet("color: #666;");
+		footer->addWidget(reloadBtn);
+		footer->addStretch(1);
+		footer->addWidget(m_statusLabel);
+		root->addLayout(footer);
 
-        connect(reloadBtn, &QPushButton::clicked, this, &NdiNetworkConfigWidget::loadFromDisk);
+		connect(reloadBtn, &QPushButton::clicked, this, &NdiNetworkConfigWidget::loadFromDisk);
 
-        setWindowTitle("NDI Network Configuration");
-        resize(760, 560);
-    }
+		setWindowTitle("NDI Network Configuration");
+		resize(760, 560);
+	}
 
-    void loadFromDisk()
-    {
-        m_pathLabel->setText("Config file: " + m_configPath);
+	void loadFromDisk()
+	{
+		m_pathLabel->setText("Config file: " + m_configPath);
 
-        QFile file(m_configPath);
-        if (!file.exists()) {
-            m_rootJson = QJsonObject();
-            m_statusLabel->setText("File not found - showing NDI defaults.");
-            applyDefaults();
-            return;
-        }
-        if (!file.open(QIODevice::ReadOnly)) {
-            m_statusLabel->setText("Could not open file: " + file.errorString());
-            return;
-        }
+		QFile file(m_configPath);
+		if (!file.exists()) {
+			m_rootJson = QJsonObject();
+			m_statusLabel->setText("File not found - showing NDI defaults.");
+			applyDefaults();
+			return;
+		}
+		if (!file.open(QIODevice::ReadOnly)) {
+			m_statusLabel->setText("Could not open file: " + file.errorString());
+			return;
+		}
 
-        QJsonParseError parseError{};
-        const QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parseError);
-        file.close();
+		QJsonParseError parseError{};
+		const QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parseError);
+		file.close();
 
-        if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
-            m_statusLabel->setText("JSON parse error: " + parseError.errorString());
-            return;
-        }
+		if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+			m_statusLabel->setText("JSON parse error: " + parseError.errorString());
+			return;
+		}
 
-        m_rootJson = doc.object();
-        populateFromJson();
-        m_statusLabel->setText("Loaded.");
-    }
+		m_rootJson = doc.object();
+		populateFromJson();
+		m_statusLabel->setText("Loaded.");
+	}
 
-    void applyDefaults()
-    {
-        // Viewer mode: leave fields blank when no file exists yet.
-        m_machineName->clear();
-        m_groupsSend->clear();
-        m_groupsRecv->clear();
-        m_extraIps->clear();
-        m_discoveryServer->clear();
-        m_tcpRecvEnable->setChecked(false);
-        m_unicastRecvEnable->setChecked(false);
-        m_rudpRecvEnable->setChecked(false);
-        m_multicastEnable->setChecked(false);
-        m_multicastTtl->setValue(0);
-        m_multicastNetmask->clear();
-        m_multicastNetprefix->clear();
-        m_allowedAdapters->clear();
-    }
+	void applyDefaults()
+	{
+		// Viewer mode: leave fields blank when no file exists yet.
+		m_machineName->clear();
+		m_groupsSend->clear();
+		m_groupsRecv->clear();
+		m_extraIps->clear();
+		m_discoveryServer->clear();
+		m_tcpRecvEnable->setChecked(false);
+		m_unicastRecvEnable->setChecked(false);
+		m_rudpRecvEnable->setChecked(false);
+		m_multicastEnable->setChecked(false);
+		m_multicastTtl->setValue(0);
+		m_multicastNetmask->clear();
+		m_multicastNetprefix->clear();
+		m_allowedAdapters->clear();
+	}
 
-    void populateFromJson()
-    {
-        const QJsonObject ndi = childObj(m_rootJson, "ndi");
+	void populateFromJson()
+	{
+		const QJsonObject ndi = childObj(m_rootJson, "ndi");
 
-        m_machineName->setText(ndi.value("machinename").toString());
+		m_machineName->setText(ndi.value("machinename").toString());
 
-        const QJsonObject groups = childObj(ndi, "groups");
-        m_groupsSend->setText(groups.value("send").toString());
-        m_groupsRecv->setText(groups.value("recv").toString());
+		const QJsonObject groups = childObj(ndi, "groups");
+		m_groupsSend->setText(groups.value("send").toString());
+		m_groupsRecv->setText(groups.value("recv").toString());
 
-        const QJsonObject networks = childObj(ndi, "networks");
-        m_extraIps->setText(networks.value("ips").toString());
-        m_discoveryServer->setText(networks.value("discovery").toString());
+		const QJsonObject networks = childObj(ndi, "networks");
+		m_extraIps->setText(networks.value("ips").toString());
+		m_discoveryServer->setText(networks.value("discovery").toString());
 
-        const QJsonObject tcp = childObj(ndi, "tcp");
-        m_tcpRecvEnable->setChecked(childObj(tcp, "recv").value("enable").toBool(true));
+		const QJsonObject tcp = childObj(ndi, "tcp");
+		m_tcpRecvEnable->setChecked(childObj(tcp, "recv").value("enable").toBool(true));
 
-        const QJsonObject unicast = childObj(ndi, "unicast");
-        m_unicastRecvEnable->setChecked(childObj(unicast, "recv").value("enable").toBool(true));
+		const QJsonObject unicast = childObj(ndi, "unicast");
+		m_unicastRecvEnable->setChecked(childObj(unicast, "recv").value("enable").toBool(true));
 
-        const QJsonObject rudp = childObj(ndi, "rudp");
-        m_rudpRecvEnable->setChecked(childObj(rudp, "recv").value("enable").toBool(true));
+		const QJsonObject rudp = childObj(ndi, "rudp");
+		m_rudpRecvEnable->setChecked(childObj(rudp, "recv").value("enable").toBool(true));
 
-        const QJsonObject multicast = childObj(ndi, "multicast");
-        const QJsonObject mcSend = childObj(multicast, "send");
-        m_multicastEnable->setChecked(mcSend.value("enable").toBool(true));
-        m_multicastTtl->setValue(mcSend.value("ttl").toInt(1));
-        m_multicastNetmask->setText(mcSend.value("netmask").toString("255.255.0.0"));
-        m_multicastNetprefix->setText(mcSend.value("netprefix").toString("239.255.0.0"));
+		const QJsonObject multicast = childObj(ndi, "multicast");
+		const QJsonObject mcSend = childObj(multicast, "send");
+		m_multicastEnable->setChecked(mcSend.value("enable").toBool(true));
+		m_multicastTtl->setValue(mcSend.value("ttl").toInt(1));
+		m_multicastNetmask->setText(mcSend.value("netmask").toString("255.255.0.0"));
+		m_multicastNetprefix->setText(mcSend.value("netprefix").toString("239.255.0.0"));
 
-        m_allowedAdapters->clear();
-        const QJsonArray allowed = childObj(ndi, "adapters").value("allowed").toArray();
-        for (const QJsonValue &v : allowed)
-            m_allowedAdapters->addItem(v.toString());
-    }
+		m_allowedAdapters->clear();
+		const QJsonArray allowed = childObj(ndi, "adapters").value("allowed").toArray();
+		for (const QJsonValue &v : allowed)
+			m_allowedAdapters->addItem(v.toString());
+	}
 
-    void saveToDisk()
-    {
-        // Saving is disabled in viewer mode; do nothing.
-        QMessageBox::information(this, "Read-only Viewer", "Saving is disabled in the NDI config viewer.");
-    }
+	void saveToDisk()
+	{
+		// Saving is disabled in viewer mode; do nothing.
+		QMessageBox::information(this, "Read-only Viewer", "Saving is disabled in the NDI config viewer.");
+	}
 };
 
 /*

@@ -43,7 +43,11 @@ static int64_t projected_relation(uint64_t a_ts_ns, uint64_t a_wall_ns, uint64_t
 
 // Constructor
 ReceiverInfo::ReceiverInfo(obs_source_t *ndi_source)
-	: m_source(ndi_source), m_receiver(nullptr), ndi_name(""), snapshot(), running()
+	: m_source(ndi_source),
+	  m_receiver(nullptr),
+	  ndi_name(""),
+	  snapshot(),
+	  running()
 {
 }
 
@@ -120,7 +124,9 @@ std::string ReceiverInfo::get_brief_receiver_status() const
 	std::string status = "Video: ";
 	if (snapshot.osFPS > 0.0) {
 		status += "Active";
-		status += ", Format: " + network_monitor->getFormatDescription(snapshot.xres,snapshot.yres,snapshot.frame_rate_D, snapshot.frame_rate_N, snapshot.fourcc);
+		status += ", Format: " + network_monitor->getFormatDescription(snapshot.xres, snapshot.yres,
+									       snapshot.frame_rate_D,
+									       snapshot.frame_rate_N, snapshot.fourcc);
 	} else {
 		status += "Inactive";
 	}
@@ -202,7 +208,7 @@ void ReceiverInfo::receive_video_frame(uint64_t t0, uint64_t t1, uint64_t t2, ND
 			const int64_t drift =
 				projected_relation(video_ts_ns, video_wall_ns, last_audio_ts_ns_, last_audio_wall_ns_);
 			running.av_drift_ns = drift;
-			add_drift_sample(video_wall_ns, drift); 
+			add_drift_sample(video_wall_ns, drift);
 			if (!have_av_drift_) {
 				running.av_drift_min_ns = drift;
 				running.av_drift_max_ns = drift;
@@ -230,13 +236,13 @@ void ReceiverInfo::receive_audio_frame(uint64_t t0, uint64_t t1, uint64_t, NDIli
 
 	if (ndi_frame.timestamp != NDIlib_recv_timestamp_undefined) {
 		const uint64_t audio_ts_ns = static_cast<uint64_t>(ndi_frame.timestamp) * 100ULL;
-		const uint64_t audio_wall_ns = t1; 
+		const uint64_t audio_wall_ns = t1;
 
 		if (last_video_ts_ns_ && last_video_wall_ns_) {
 			const int64_t drift =
 				projected_relation(last_video_ts_ns_, last_video_wall_ns_, audio_ts_ns, audio_wall_ns);
 			running.av_drift_ns = drift;
-			add_drift_sample(audio_wall_ns, drift); 
+			add_drift_sample(audio_wall_ns, drift);
 			if (!have_av_drift_) {
 				running.av_drift_min_ns = drift;
 				running.av_drift_max_ns = drift;

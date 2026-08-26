@@ -18,8 +18,7 @@
 #include "change-notifier.h"
 #include <utility>
 
-		   ChangeNotifier::ChangeNotifier(std::function<void()> onChange, QObject *parent)
-	: QObject(parent)
+ChangeNotifier::ChangeNotifier(std::function<void()> onChange, QObject *parent) : QObject(parent)
 {
 	// If a callable was provided, connect it to the `changed` signal and keep
 	// the QMetaObject::Connection so it can be disconnected automatically in

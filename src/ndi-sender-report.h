@@ -47,9 +47,9 @@ struct NDISenderStats {
 	uint64_t start_video_frame_os = 0;
 	double tsFPS = 0.;
 	double osFPS = 0.;
-	double deficit_fps = 0.0; // fraction of target FPS that was not achieved
-	double deficit_sps = 0.0; // fraction of target SPS that was not achieved
-	double budget_used_per_frame_blocking = 0.0; // fraction of time spent in send per frame on average
+	double deficit_fps = 0.0;                      // fraction of target FPS that was not achieved
+	double deficit_sps = 0.0;                      // fraction of target SPS that was not achieved
+	double budget_used_per_frame_blocking = 0.0;   // fraction of time spent in send per frame on average
 	double budget_used_per_frame_processing = 0.0; // fraction of time spent in processing per frame on average
 	size_t audio_sample_count = 0;
 	uint64_t last_audio_sample_timestamp = 0;

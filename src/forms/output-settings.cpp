@@ -108,14 +108,12 @@ OutputSettings::OutputSettings(QWidget *parent) : QDialog(parent), ui(new Ui::Ou
 				       ? QString("Missing (need %1+)").arg(PLUGIN_MIN_NDI_VERSION)
 				       : QString("Too old (%1 < %2)").arg(ndiVersionShort, PLUGIN_MIN_NDI_VERSION)));
 
-   auto *networkMonitorButton = new QPushButton(tr("Network Monitor"), this);
+	auto *networkMonitorButton = new QPushButton(tr("Network Monitor"), this);
 	networkMonitorButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
 	networkMonitorButton->adjustSize();
 	networkMonitorButton->setFixedWidth(networkMonitorButton->sizeHint().width());
 	ui->horizontalLayoutFooter->insertWidget(0, networkMonitorButton);
-	connect(networkMonitorButton, &QPushButton::clicked, this, []() {
-     open_network_monitor_dialog();
-	});
+	connect(networkMonitorButton, &QPushButton::clicked, this, []() { open_network_monitor_dialog(); });
 
 	// DistroAV Section Logic
 	// Check For Update Button

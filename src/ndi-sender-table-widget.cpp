@@ -135,7 +135,7 @@ QVariant NdiSenderTableModel::data(const QModelIndex &index, int role) const
 			return QVariant(report.tsFPS);
 		case ColFpsDeficit:
 			return QVariant(report.deficit_fps);
-		case ColSpsDeficit:			
+		case ColSpsDeficit:
 			return QVariant(report.deficit_sps);
 		case ColJitterRatio:
 			return QVariant(report.jitter_ratio);
@@ -250,7 +250,7 @@ NdiSenderTableWidget::NdiSenderTableWidget(QWidget *parent)
 	layout->addLayout(footer);
 
 	connect(copyBtn, &QPushButton::clicked, this, []() {
-      std::string text = network_monitor->getFormattedSenderReport();
+		std::string text = network_monitor->getFormattedSenderReport();
 		QClipboard *clipboard = QApplication::clipboard();
 		clipboard->setText(QString::fromUtf8(text));
 	});

@@ -18,7 +18,7 @@
 #include "plugin-main.h"
 #include "network-monitor.h"
 #include "config-notifier.h"
-#include "ndi-network-report.h"	
+#include "ndi-network-report.h"
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -62,9 +62,9 @@ std::string formatBps(double bps)
 	return out.str();
 }
 
-template <size_t N>
+template<size_t N>
 std::array<std::size_t, N> computeReceiverWidths(const std::array<ReceiverColumnDef, N> &columns,
-							 const NetworkMonitor::ReceiverInfoMap &receivers)
+						 const NetworkMonitor::ReceiverInfoMap &receivers)
 {
 	std::array<std::size_t, N> widths = {};
 	for (std::size_t i = 0; i < N; ++i) {
@@ -79,7 +79,7 @@ std::array<std::size_t, N> computeReceiverWidths(const std::array<ReceiverColumn
 			std::to_string(snapshot.video_frames_dropped),
 			std::to_string(snapshot.video_queue_size),
 			snapshot.format_description,
-          formatFixed2(snapshot.osFPS),
+			formatFixed2(snapshot.osFPS),
 			formatFixed2(snapshot.tsFPS),
 			formatFixed2(snapshot.deficit_fps),
 			formatFixed2(snapshot.deficit_sps),
@@ -89,15 +89,15 @@ std::array<std::size_t, N> computeReceiverWidths(const std::array<ReceiverColumn
 			formatFixed2(snapshot.av_drift_ns_per_hour / 1000000.0),
 		}};
 		for (std::size_t i = 0; i < N; ++i)
-          widths[i] = std::max<std::size_t>(widths[i], values[i].size());
+			widths[i] = std::max<std::size_t>(widths[i], values[i].size());
 	}
 
 	return widths;
 }
 
-template <size_t N>
+template<size_t N>
 std::array<std::size_t, N> computeSenderWidths(const std::array<SenderColumnDef, N> &columns,
-						   const NetworkMonitor::SenderInfoMap &senders)
+					       const NetworkMonitor::SenderInfoMap &senders)
 {
 	std::array<std::size_t, N> widths = {};
 	for (std::size_t i = 0; i < N; ++i) {
@@ -128,7 +128,7 @@ std::array<std::size_t, N> computeSenderWidths(const std::array<SenderColumnDef,
 	return widths;
 }
 
-template <size_t N>
+template<size_t N>
 void appendReceiverSeparator(std::ostringstream &out, const std::array<std::size_t, N> &widths, char fill)
 {
 	out << '+';
@@ -138,9 +138,9 @@ void appendReceiverSeparator(std::ostringstream &out, const std::array<std::size
 	out << '\n';
 }
 
-template <size_t N>
+template<size_t N>
 void appendReceiverRow(std::ostringstream &out, const std::array<std::string, N> &values,
-				   const std::array<std::size_t, N> &widths)
+		       const std::array<std::size_t, N> &widths)
 {
 	out << '|';
 	for (std::size_t i = 0; i < N; ++i) {
@@ -175,7 +175,8 @@ NetworkMonitor::~NetworkMonitor()
 	if (m_thread.joinable()) {
 		m_thread.join();
 	}
-	if (ndiLib) ndiLib->find_destroy(m_ndi_find);
+	if (ndiLib)
+		ndiLib->find_destroy(m_ndi_find);
 }
 
 SenderInfo *NetworkMonitor::registerSender(NDIlib_send_instance_t sender, std::string tag)
@@ -223,7 +224,7 @@ void NetworkMonitor::unregisterSender(NDIlib_send_instance_t sender)
 SenderInfo *NetworkMonitor::getSenderInfo(NDIlib_send_instance_t sender) const
 {
 	std::lock_guard<std::mutex> lock(m_mutex);
-	
+
 	if (sender == nullptr) {
 		return nullptr;
 	}
@@ -239,11 +240,11 @@ SenderInfo *NetworkMonitor::getSenderInfo(NDIlib_send_instance_t sender) const
 SenderInfo *NetworkMonitor::getSenderInfo(std::string tag) const
 {
 	std::lock_guard<std::mutex> lock(m_mutex);
-	
+
 	if (tag.empty()) {
 		return nullptr;
 	}
-	
+
 	for (const auto &pair : m_senders) {
 		if (pair.second->get_tag() == tag) {
 			return pair.second.get();
@@ -252,7 +253,6 @@ SenderInfo *NetworkMonitor::getSenderInfo(std::string tag) const
 
 	return nullptr;
 }
-
 
 std::string NetworkMonitor::getSenderStatus(SenderInfo *senderInfo) const
 {
@@ -332,7 +332,7 @@ std::string getFormattedReceiverReport(const NetworkMonitor::ReceiverInfoMap &m_
 			std::to_string(snapshot.video_frames_dropped),
 			std::to_string(snapshot.video_queue_size),
 			snapshot.format_description,
-          formatFixed2(snapshot.osFPS),
+			formatFixed2(snapshot.osFPS),
 			formatFixed2(snapshot.tsFPS),
 			formatFixed2(snapshot.deficit_fps),
 			formatFixed2(snapshot.deficit_sps),
@@ -406,7 +406,7 @@ std::string getFormattedSenderReport(const NetworkMonitor::SenderInfoMap &m_send
 }
 
 void dumpSenderReportToLog(const NetworkMonitor::SenderInfoMap &m_senders)
-{		
+{
 	const char reportHeader[] = "NDI Sender Report";
 	obs_log(LOG_INFO, "%s ----------------------------------------", reportHeader);
 	for (const auto &pair : m_senders) {
@@ -415,18 +415,24 @@ void dumpSenderReportToLog(const NetworkMonitor::SenderInfoMap &m_senders)
 			continue;
 		std::string ndi_name = sender->get_ndi_name();
 		const auto snapshot = sender->getReportSnapshot();
-		obs_log(LOG_INFO, "%s '%s' Format: %s", reportHeader, ndi_name.c_str(), snapshot.format_description.c_str());
+		obs_log(LOG_INFO, "%s '%s' Format: %s", reportHeader, ndi_name.c_str(),
+			snapshot.format_description.c_str());
 		obs_log(LOG_INFO, "%s '%s' Receivers: %zu", reportHeader, ndi_name.c_str(), snapshot.receivers);
-		obs_log(LOG_INFO, "%s '%s' Disc?: %s", reportHeader, ndi_name.c_str(), snapshot.discoverable ? "Yes" : "No");
+		obs_log(LOG_INFO, "%s '%s' Disc?: %s", reportHeader, ndi_name.c_str(),
+			snapshot.discoverable ? "Yes" : "No");
 		obs_log(LOG_INFO, "%s '%s' FPS: %.2f fps", reportHeader, ndi_name.c_str(), snapshot.osFPS);
 		obs_log(LOG_INFO, "%s '%s' TS FPS: %.2f fps", reportHeader, ndi_name.c_str(), snapshot.tsFPS);
 		obs_log(LOG_INFO, "%s '%s' FPS Deficit %%: %.2f", reportHeader, ndi_name.c_str(), snapshot.deficit_fps);
 		obs_log(LOG_INFO, "%s '%s' SPS Deficit %%: %.2f", reportHeader, ndi_name.c_str(), snapshot.deficit_sps);
 		obs_log(LOG_INFO, "%s '%s' Jitter Ratio: %.2f", reportHeader, ndi_name.c_str(), snapshot.jitter_ratio);
-		obs_log(LOG_INFO, "%s '%s' Send Block %%: %.2f", reportHeader, ndi_name.c_str(), snapshot.budget_used_per_frame_blocking);
-		obs_log(LOG_INFO, "%s '%s' Processing %%: %.2f", reportHeader, ndi_name.c_str(), snapshot.budget_used_per_frame_processing);
-		obs_log(LOG_INFO, "%s '%s' Recvr Changes: %zu", reportHeader, ndi_name.c_str(), snapshot.receiver_changes);
-		obs_log(LOG_INFO, "%s '%s' Disc Changes: %zu", reportHeader, ndi_name.c_str(), snapshot.discoverable_changes);
+		obs_log(LOG_INFO, "%s '%s' Send Block %%: %.2f", reportHeader, ndi_name.c_str(),
+			snapshot.budget_used_per_frame_blocking);
+		obs_log(LOG_INFO, "%s '%s' Processing %%: %.2f", reportHeader, ndi_name.c_str(),
+			snapshot.budget_used_per_frame_processing);
+		obs_log(LOG_INFO, "%s '%s' Recvr Changes: %zu", reportHeader, ndi_name.c_str(),
+			snapshot.receiver_changes);
+		obs_log(LOG_INFO, "%s '%s' Disc Changes: %zu", reportHeader, ndi_name.c_str(),
+			snapshot.discoverable_changes);
 	}
 }
 
@@ -439,23 +445,37 @@ void dumpAdapterReportToLog(const NdiNetworkReport &m_network_report)
 
 	for (const auto &adapter : m_network_report.adapters) {
 		std::string adapterName = adapter.friendlyName.empty() ? adapter.description : adapter.friendlyName;
-		obs_log(LOG_INFO, "%s '%s' NDI: %s", reportHeader, adapterName.c_str(), adapter.ndiCandidate ? "Yes" : "No");
-		obs_log(LOG_INFO, "%s '%s' Description: %s", reportHeader, adapterName.c_str(), adapter.description.c_str());
-		obs_log(LOG_INFO, "%s '%s' IPv4 Address: %s", reportHeader, adapterName.c_str(), adapter.ipv4Address.c_str());
-		obs_log(LOG_INFO, "%s '%s' Subnet Mask: %s", reportHeader, adapterName.c_str(), adapter.subnetMask.c_str());
+		obs_log(LOG_INFO, "%s '%s' NDI: %s", reportHeader, adapterName.c_str(),
+			adapter.ndiCandidate ? "Yes" : "No");
+		obs_log(LOG_INFO, "%s '%s' Description: %s", reportHeader, adapterName.c_str(),
+			adapter.description.c_str());
+		obs_log(LOG_INFO, "%s '%s' IPv4 Address: %s", reportHeader, adapterName.c_str(),
+			adapter.ipv4Address.c_str());
+		obs_log(LOG_INFO, "%s '%s' Subnet Mask: %s", reportHeader, adapterName.c_str(),
+			adapter.subnetMask.c_str());
 		obs_log(LOG_INFO, "%s '%s' Up: %s", reportHeader, adapterName.c_str(), adapter.isUp ? "Yes" : "No");
-		obs_log(LOG_INFO, "%s '%s' Multi: %s", reportHeader, adapterName.c_str(), adapter.supportsMulticast ? "Yes" : "No");
-		obs_log(LOG_INFO, "%s '%s' Virt: %s", reportHeader, adapterName.c_str(), adapter.looksVirtual ? "Yes" : "No");
-		obs_log(LOG_INFO, "%s '%s' Firewall Enabled: %s", reportHeader, adapterName.c_str(), adapter.firewallEnabled ? "Yes" : "No");
-		obs_log(LOG_INFO, "%s '%s' mDNS Port Open: %s", reportHeader, adapterName.c_str(), FirewallPortAccessToString(adapter.mdnsPortOpen).c_str());
-		obs_log(LOG_INFO, "%s '%s' NDI Ports Open: %s", reportHeader, adapterName.c_str(), FirewallPortAccessToString(adapter.ndiPortsOpen).c_str());
-		obs_log(LOG_INFO, "%s '%s' F&P Sharing: %s", reportHeader, adapterName.c_str(), FirewallPortAccessToString(adapter.filePrinterSharing).c_str());
-		obs_log(LOG_INFO, "%s '%s' Type: %lu (%s)", reportHeader, adapterName.c_str(), static_cast<unsigned long>(adapter.ifType),
-			IfTypeToString(adapter.ifType).c_str());
-		obs_log(LOG_INFO, "%s '%s' In: %s", reportHeader, adapterName.c_str(), formatBps(adapter.inBps).c_str());
-		obs_log(LOG_INFO, "%s '%s' Out: %s", reportHeader, adapterName.c_str(), formatBps(adapter.outBps).c_str());
-		obs_log(LOG_INFO, "%s '%s' Rx Speed: %s", reportHeader, adapterName.c_str(), formatBps(adapter.receiveSpeed).c_str());
-		obs_log(LOG_INFO, "%s '%s' Tx Speed: %s", reportHeader, adapterName.c_str(), formatBps(adapter.transmitSpeed).c_str());
+		obs_log(LOG_INFO, "%s '%s' Multi: %s", reportHeader, adapterName.c_str(),
+			adapter.supportsMulticast ? "Yes" : "No");
+		obs_log(LOG_INFO, "%s '%s' Virt: %s", reportHeader, adapterName.c_str(),
+			adapter.looksVirtual ? "Yes" : "No");
+		obs_log(LOG_INFO, "%s '%s' Firewall Enabled: %s", reportHeader, adapterName.c_str(),
+			adapter.firewallEnabled ? "Yes" : "No");
+		obs_log(LOG_INFO, "%s '%s' mDNS Port Open: %s", reportHeader, adapterName.c_str(),
+			FirewallPortAccessToString(adapter.mdnsPortOpen).c_str());
+		obs_log(LOG_INFO, "%s '%s' NDI Ports Open: %s", reportHeader, adapterName.c_str(),
+			FirewallPortAccessToString(adapter.ndiPortsOpen).c_str());
+		obs_log(LOG_INFO, "%s '%s' F&P Sharing: %s", reportHeader, adapterName.c_str(),
+			FirewallPortAccessToString(adapter.filePrinterSharing).c_str());
+		obs_log(LOG_INFO, "%s '%s' Type: %lu (%s)", reportHeader, adapterName.c_str(),
+			static_cast<unsigned long>(adapter.ifType), IfTypeToString(adapter.ifType).c_str());
+		obs_log(LOG_INFO, "%s '%s' In: %s", reportHeader, adapterName.c_str(),
+			formatBps(adapter.inBps).c_str());
+		obs_log(LOG_INFO, "%s '%s' Out: %s", reportHeader, adapterName.c_str(),
+			formatBps(adapter.outBps).c_str());
+		obs_log(LOG_INFO, "%s '%s' Rx Speed: %s", reportHeader, adapterName.c_str(),
+			formatBps(adapter.receiveSpeed).c_str());
+		obs_log(LOG_INFO, "%s '%s' Tx Speed: %s", reportHeader, adapterName.c_str(),
+			formatBps(adapter.transmitSpeed).c_str());
 	}
 }
 
@@ -470,18 +490,25 @@ void dumpReceiverReportToLog(const NetworkMonitor::ReceiverInfoMap &m_receivers)
 
 		std::string ndi_name = receiver->get_ndi_name();
 		const auto snapshot = receiver->getReportSnapshot();
-		obs_log(LOG_INFO, "%s '%s' OBS Source Name: %s", reportHeader, ndi_name.c_str(), snapshot.obs_source_name.c_str());
-		obs_log(LOG_INFO, "%s '%s' Dropped frames: %zu", reportHeader, ndi_name.c_str(), snapshot.video_frames_dropped);
-		obs_log(LOG_INFO, "%s '%s' Queued frames: %zu", reportHeader, ndi_name.c_str(), snapshot.video_queue_size);
-		obs_log(LOG_INFO, "%s '%s' Format: %s", reportHeader, ndi_name.c_str(), snapshot.format_description.c_str());
+		obs_log(LOG_INFO, "%s '%s' OBS Source Name: %s", reportHeader, ndi_name.c_str(),
+			snapshot.obs_source_name.c_str());
+		obs_log(LOG_INFO, "%s '%s' Dropped frames: %zu", reportHeader, ndi_name.c_str(),
+			snapshot.video_frames_dropped);
+		obs_log(LOG_INFO, "%s '%s' Queued frames: %zu", reportHeader, ndi_name.c_str(),
+			snapshot.video_queue_size);
+		obs_log(LOG_INFO, "%s '%s' Format: %s", reportHeader, ndi_name.c_str(),
+			snapshot.format_description.c_str());
 		obs_log(LOG_INFO, "%s '%s' FPS: %.2f fps", reportHeader, ndi_name.c_str(), snapshot.osFPS);
 		obs_log(LOG_INFO, "%s '%s' TS FPS: %.2f fps", reportHeader, ndi_name.c_str(), snapshot.tsFPS);
 		obs_log(LOG_INFO, "%s '%s' FPS Deficit %%: %.2f", reportHeader, ndi_name.c_str(), snapshot.deficit_fps);
 		obs_log(LOG_INFO, "%s '%s' SPS Deficit %%: %.2f", reportHeader, ndi_name.c_str(), snapshot.deficit_sps);
 		obs_log(LOG_INFO, "%s '%s' Jitter Ratio: %.2f", reportHeader, ndi_name.c_str(), snapshot.jitter_ratio);
-		obs_log(LOG_INFO, "%s '%s' Capture %%: %.2f", reportHeader, ndi_name.c_str(), snapshot.budget_used_per_frame_capture);
-		obs_log(LOG_INFO, "%s '%s' Process %%: %.2f", reportHeader, ndi_name.c_str(), snapshot.budget_used_per_frame_processing);
-		obs_log(LOG_INFO, "%s '%s' Drift ms/hr: %.2f", reportHeader, ndi_name.c_str(), snapshot.av_drift_ns_per_hour / 1000000.0);
+		obs_log(LOG_INFO, "%s '%s' Capture %%: %.2f", reportHeader, ndi_name.c_str(),
+			snapshot.budget_used_per_frame_capture);
+		obs_log(LOG_INFO, "%s '%s' Process %%: %.2f", reportHeader, ndi_name.c_str(),
+			snapshot.budget_used_per_frame_processing);
+		obs_log(LOG_INFO, "%s '%s' Drift ms/hr: %.2f", reportHeader, ndi_name.c_str(),
+			snapshot.av_drift_ns_per_hour / 1000000.0);
 	}
 }
 
@@ -535,7 +562,7 @@ void NetworkMonitor::setReceiver(obs_source_t *ndi_source, NDIlib_recv_instance_
 			it->second->set_receiver(ndi_receiver);
 		}
 	}
-}	
+}
 
 void NetworkMonitor::unregisterReceiver(obs_source_t *ndi_source)
 {
@@ -561,7 +588,7 @@ void NetworkMonitor::getCurrentSenderInfo(NDIlib_send_instance_t sender, SenderI
 	}
 
 	if (sender) {
-		senderInfo->calculate_stats(); 
+		senderInfo->calculate_stats();
 	}
 }
 
@@ -572,7 +599,7 @@ void NetworkMonitor::getCurrentReceiverInfo(obs_source_t *ndi_source, ReceiverIn
 	}
 
 	if (ndi_source) {
-		receiverInfo->calculate_stats(); 
+		receiverInfo->calculate_stats();
 	}
 }
 void NetworkMonitor::monitorLoop()
@@ -583,7 +610,7 @@ void NetworkMonitor::monitorLoop()
 
 		updateNetworkReport(); // modifies m_network_report.adapters
 		UpdateNicbps(m_network_report.adapters);
-		
+
 		notifyNetworkChange(); // Notify the UI that the network report has changed, so it can update the table view.
 
 		StatusMap oldStatusMap, newStatusMap;
@@ -591,7 +618,7 @@ void NetworkMonitor::monitorLoop()
 		newStatusMap.clear();
 
 		// Capture the existing status for each sender and update the current status. Only look at the brief status string,
-		// which is a summary of the sender's state seen in properties. 
+		// which is a summary of the sender's state seen in properties.
 		// This is done while holding the lock to ensure no changes occur to the sender list during this operation.
 		{
 			std::lock_guard<std::mutex> lock(m_mutex);
@@ -604,14 +631,14 @@ void NetworkMonitor::monitorLoop()
 
 		// Notify any registered ChangeNotifier objects for senders that have changed status.
 		onSenderChanged(oldStatusMap, newStatusMap);
-		
+
 		notifySenderChange(); // Notify the UI that the sender list has changed, so it can update the table view.
 
 		oldStatusMap.clear();
 		newStatusMap.clear();
-		
-		// Capture the existing status for each receiver and update the current status. Only look at the brief status string, 
-		// which is a summary of the receiver's state seen in properties. 
+
+		// Capture the existing status for each receiver and update the current status. Only look at the brief status string,
+		// which is a summary of the receiver's state seen in properties.
 		// This is done while holding the lock to ensure no changes occur to the receiver list during this operation.
 		{
 			std::lock_guard<std::mutex> lock(m_mutex);
@@ -621,10 +648,10 @@ void NetworkMonitor::monitorLoop()
 				newStatusMap[receiver.first] = receiver.second->get_brief_receiver_status();
 			}
 		}
-		
+
 		// Notify any registered ChangeNotifier objects for receivers that have changed status.
 		onReceiverChanged(oldStatusMap, newStatusMap);
-		
+
 		notifyReceiverChange(); // Notify the UI that the receiver list has changed so it can update the table widget.
 
 		// Sleep for the configured interval, but wake early if the
@@ -666,7 +693,7 @@ void NetworkMonitor::onSenderChanged(StatusMap before, StatusMap now)
 			sptr->notify_change();
 			changed = true;
 		}
-    }
+	}
 }
 
 void NetworkMonitor::onReceiverChanged(StatusMap before, StatusMap now)
@@ -674,7 +701,7 @@ void NetworkMonitor::onReceiverChanged(StatusMap before, StatusMap now)
 	bool changed = false;
 
 	for (const auto &pair : before) {
-		obs_source_t* key = (obs_source_t*)pair.first;
+		obs_source_t *key = (obs_source_t *)pair.first;
 		bool should_notify = false;
 
 		// Decide whether this key changed according to the maps
@@ -709,9 +736,9 @@ void NetworkMonitor::updateNetworkReport()
 	for (auto &adapter : new_report.adapters) {
 		// Find the corresponding adapter in the existing report
 		auto it = std::find_if(m_network_report.adapters.begin(), m_network_report.adapters.end(),
-			[&adapter](const NdiAdapterInfo &existing_adapter) {
-				return existing_adapter.luid.Value == adapter.luid.Value;
-			});
+				       [&adapter](const NdiAdapterInfo &existing_adapter) {
+					       return existing_adapter.luid.Value == adapter.luid.Value;
+				       });
 		if (it != m_network_report.adapters.end()) {
 			// Update the existing adapter's information with the new data
 			it->inBps = adapter.inBps;
@@ -736,12 +763,13 @@ void NetworkMonitor::updateNetworkReport()
 	// remove any adapters that are no longer present in the new report
 	m_network_report.adapters.erase(
 		std::remove_if(m_network_report.adapters.begin(), m_network_report.adapters.end(),
-			[&new_report](const NdiAdapterInfo &existing_adapter) {
-				return std::none_of(new_report.adapters.begin(), new_report.adapters.end(),
-					[&existing_adapter](const NdiAdapterInfo &adapter) {
-						return existing_adapter.luid.Value == adapter.luid.Value;
-					});
-			}),
+			       [&new_report](const NdiAdapterInfo &existing_adapter) {
+				       return std::none_of(new_report.adapters.begin(), new_report.adapters.end(),
+							   [&existing_adapter](const NdiAdapterInfo &adapter) {
+								   return existing_adapter.luid.Value ==
+									  adapter.luid.Value;
+							   });
+			       }),
 		m_network_report.adapters.end());
 }
 
@@ -752,16 +780,17 @@ void NetworkMonitor::updateNDISourceList()
 		return;
 	}
 
-	uint32_t n_sources =0;
-	uint32_t last_n_sources =0;
+	uint32_t n_sources = 0;
+	uint32_t last_n_sources = 0;
 	const NDIlib_source_t *sources = NULL;
 	do {
 		std::lock_guard<std::mutex> lock(m_mutex);
 
-		if (ndiLib && m_ndi_find) ndiLib->find_wait_for_sources(m_ndi_find,1000);
+		if (ndiLib && m_ndi_find)
+			ndiLib->find_wait_for_sources(m_ndi_find, 1000);
 		last_n_sources = n_sources;
 
-		n_sources =0;
+		n_sources = 0;
 		if (ndiLib)
 			sources = ndiLib->find_get_current_sources(m_ndi_find, &n_sources);
 	} while (n_sources > last_n_sources);
@@ -769,7 +798,7 @@ void NetworkMonitor::updateNDISourceList()
 	std::vector<std::string> newList;
 	newList.reserve(n_sources);
 
-	for (uint32_t i =0; i < n_sources; ++i) {
+	for (uint32_t i = 0; i < n_sources; ++i) {
 		std::string name = std::string(sources[i].p_ndi_name ? sources[i].p_ndi_name : "");
 		newList.push_back(name);
 	}
@@ -788,7 +817,7 @@ void NetworkMonitor::updateNDISourceList()
 	if (newList.size() != oldList.size()) {
 		listChanged = true;
 	} else {
-		for (size_t i =0; i < newList.size(); ++i) {
+		for (size_t i = 0; i < newList.size(); ++i) {
 			if (newList[i] != oldList[i]) {
 				listChanged = true;
 				break;
@@ -861,5 +890,5 @@ void NetworkMonitor::dumpNetworkReportToLog() const
 {
 	dumpSenderReportToLog(m_senders);
 	dumpReceiverReportToLog(m_receivers);
-	dumpAdapterReportToLog(m_network_report);	
+	dumpAdapterReportToLog(m_network_report);
 }

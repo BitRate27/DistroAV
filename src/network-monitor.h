@@ -41,9 +41,9 @@ class NetworkMonitor {
 public:
 	NetworkMonitor();
 	~NetworkMonitor();
-	
+
 	typedef std::map<NDIlib_send_instance_t, std::shared_ptr<SenderInfo>> SenderInfoMap;
-	typedef std::map<obs_source_t*, std::shared_ptr<ReceiverInfo>> ReceiverInfoMap;
+	typedef std::map<obs_source_t *, std::shared_ptr<ReceiverInfo>> ReceiverInfoMap;
 	typedef std::map<void *, std::string> StatusMap;
 
 	// Non-copyable, non-movable: owns a live thread and synchronization
@@ -91,14 +91,16 @@ public:
 		}
 		return receiver_info_list;
 	}
-	std::vector<NdiAdapterInfo> getAllAdapterInfo() const {
+	std::vector<NdiAdapterInfo> getAllAdapterInfo() const
+	{
 		std::lock_guard<std::mutex> lock(m_mutex);
 		return m_network_report.adapters;
 	}
 
 	std::string getFormattedAdapterReport() const { return FormatNdiNetworkReport(m_network_report); }
-	
-	void setNetworkChangeNotifier(ChangeNotifier *notifier) {
+
+	void setNetworkChangeNotifier(ChangeNotifier *notifier)
+	{
 		std::lock_guard<std::mutex> lock(m_mutex);
 		m_network_change_notifier = notifier;
 	}
@@ -138,10 +140,10 @@ public:
 	// Returns a string representation of the sender's status. This is updated periodically by the monitor thread.
 	std::string getSenderStatus(SenderInfo *sender) const;
 
-    // Returns a string representation of the receiver's status. This is updated periodically by the monitor thread.
+	// Returns a string representation of the receiver's status. This is updated periodically by the monitor thread.
 	std::string getReceiverStatus(ReceiverInfo *sender) const;
 
-    std::string getFormattedNetworkReport() const { return FormatNdiNetworkReport( m_network_report) ; }
+	std::string getFormattedNetworkReport() const { return FormatNdiNetworkReport(m_network_report); }
 	std::string getFormattedReceiverReport() const;
 	std::string getFormattedSenderReport() const;
 
@@ -158,13 +160,13 @@ public:
 
 private:
 	void monitorLoop();
-	void onSenderChanged(StatusMap before, StatusMap now); // hook for the periodic check
+	void onSenderChanged(StatusMap before, StatusMap now);   // hook for the periodic check
 	void onReceiverChanged(StatusMap before, StatusMap now); // hook for the periodic check
 	void getCurrentSenderInfo(NDIlib_send_instance_t sender, SenderInfo *senderInfo);
 	void getCurrentReceiverInfo(obs_source_t *ndi_source, ReceiverInfo *receiverInfo);
 	void updateNDISourceList();
 	void updateNetworkReport();
-    std::string FormattedReceiverReport(const ReceiverInfoMap &m_receivers) const;
+	std::string FormattedReceiverReport(const ReceiverInfoMap &m_receivers) const;
 	mutable std::mutex m_list_mutex;
 	std::vector<std::string> m_ndi_source_list;
 	std::condition_variable m_cv;
@@ -172,7 +174,7 @@ private:
 	std::atomic<bool> m_running;
 	std::atomic<std::chrono::milliseconds> m_checkInterval;
 	mutable std::mutex m_mutex;
-	SenderInfoMap m_senders; // map of sender to status info
+	SenderInfoMap m_senders;     // map of sender to status info
 	ReceiverInfoMap m_receivers; // map of receiver to status info
 	NDIlib_find_instance_t m_ndi_find;
 	NdiNetworkReport m_network_report;
@@ -186,6 +188,3 @@ std::string getFormattedSenderReport(const NetworkMonitor::SenderInfoMap &m_send
 void dumpAdapterReportToLog(const NdiNetworkReport &m_network_report);
 void dumpReceiverReportToLog(const NetworkMonitor::ReceiverInfoMap &m_receivers);
 void dumpSenderReportToLog(const NetworkMonitor::SenderInfoMap &m_senders);
-
-
-

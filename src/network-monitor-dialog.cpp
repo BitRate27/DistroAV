@@ -76,15 +76,15 @@ bool open_network_monitor_dialog()
 	receiverTable->setReceivers(network_monitor->getAllReceiverInfo());
 	tabWidget->addTab(receiverTable, dialog->tr("Receivers"));
 
-  QString configPath;
+	QString configPath;
 #if defined(Q_OS_LINUX) || defined(Q_OS_MACOS)
-	const QString home = qEnvironmentVariableIsSet("HOME") ? QString::fromLocal8Bit(qgetenv("HOME")) : QDir::homePath();
+	const QString home = qEnvironmentVariableIsSet("HOME") ? QString::fromLocal8Bit(qgetenv("HOME"))
+							       : QDir::homePath();
 	configPath = home + "/.ndi/ndi-config.v1.json";
 #else
 	configPath = "C:\\ProgramData\\NDI\\ndi-config.v1.json";
 #endif
-	NdiNetworkConfigWidget *configWidget =
-      new NdiNetworkConfigWidget(configPath, tabWidget);
+	NdiNetworkConfigWidget *configWidget = new NdiNetworkConfigWidget(configPath, tabWidget);
 	tabWidget->addTab(configWidget, dialog->tr("Config"));
 
 	layout->addWidget(tabWidget);
@@ -105,9 +105,7 @@ bool open_network_monitor_dialog()
 	QPushButton *dumpBtn = new QPushButton(dialog->tr("Dump to OBS Log"), dialog);
 	dumpBtn->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
 	footer->addWidget(dumpBtn);
-	QObject::connect(dumpBtn, &QPushButton::clicked, dialog, []() {
-		network_monitor->dumpNetworkReportToLog();
-	});
+	QObject::connect(dumpBtn, &QPushButton::clicked, dialog, []() { network_monitor->dumpNetworkReportToLog(); });
 	QPushButton *okBtn = new QPushButton(dialog->tr("Close"), dialog);
 	okBtn->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
 	footer->addWidget(okBtn);

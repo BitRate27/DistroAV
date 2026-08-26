@@ -35,10 +35,10 @@ class NdiReceiverTableModel : public QAbstractTableModel {
 	Q_OBJECT
 public:
 	enum Column {
-     ColObsSourceName = 0,
+		ColObsSourceName = 0,
 		ColNDIName,
 		ColVideoFramesDropped,
-     ColVideoQueueDepth,
+		ColVideoQueueDepth,
 		ColFormatDescription,
 		ColOsFPS,
 		ColTsFPS,

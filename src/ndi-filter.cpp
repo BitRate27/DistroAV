@@ -204,7 +204,7 @@ bool is_filter_valid(ndi_filter_t *filter)
 void ndi_filter_raw_video(void *data, video_data *frame)
 {
 	auto f = (ndi_filter_t *)data;
-	
+
 	uint64_t t0 = os_gettime_ns();
 
 	pthread_mutex_lock(&f->ndi_sender_video_mutex);
@@ -238,14 +238,14 @@ void ndi_filter_raw_video(void *data, video_data *frame)
 	pthread_mutex_lock(&f->ndi_sender_video_mutex);
 	SYNC_DEBUG_LOG_VIDEO_TIME("NDI <- ndi_filter", obs_source_get_name(f->obs_source), video_frame.timestamp * 100,
 				  (uint8_t *)video_frame.p_data);
-	
+
 	uint64_t t1 = os_gettime_ns();
 	ndiLib->send_send_video_async_v2(f->ndi_sender, &video_frame);
 	uint64_t t2 = os_gettime_ns();
 
 	if (f->sender_info)
 		f->sender_info->send_video_frame(t0, t1, t2, video_frame, frame);
-	
+
 	pthread_mutex_unlock(&f->ndi_sender_video_mutex);
 }
 
@@ -408,10 +408,10 @@ void ndi_sender_create(ndi_filter_t *filter, obs_data_t *settings)
 	obs_data_set_string(settings, FLT_PROP_NAME, ndi_name.toUtf8().constData());
 
 	// Create a new ChangeNotifier for this filter and connect it to the filter's update_properties atomic flag.
-	filter->change_notifier = new ChangeNotifier([filter, ndi_name]() { 
+	filter->change_notifier = new ChangeNotifier([filter, ndi_name]() {
 		obs_log(LOG_DEBUG, "NDI Filter Output status changed '%s'", ndi_name.toUtf8().constData());
-			filter->update_properties.store(true);
-		});
+		filter->update_properties.store(true);
+	});
 
 	// Check the original template for tokens before any replacements are made,
 	// so injected source/filter names cannot trigger unintended token expansion.
@@ -443,7 +443,6 @@ void ndi_sender_create(ndi_filter_t *filter, obs_data_t *settings)
 	// Replace any invalid filename characters in the final NDI name
 	replace_invalid_filename_chars(&ndi_name);
 
-
 	QByteArray ndi_name_utf8 = ndi_name.toUtf8();
 
 	NDIlib_send_create_t send_desc{};
@@ -458,7 +457,7 @@ void ndi_sender_create(ndi_filter_t *filter, obs_data_t *settings)
 	send_desc.clock_video = false;
 	send_desc.clock_audio = false;
 
-	if (filter->ndi_sender) {	
+	if (filter->ndi_sender) {
 		ndi_sender_destroy(filter);
 	}
 
@@ -524,7 +523,7 @@ void *ndi_filter_create(obs_data_t *settings, obs_source_t *obs_source)
 
 	auto f = (ndi_filter_t *)bzalloc(sizeof(ndi_filter_t));
 	f->obs_source = obs_source;
-	
+
 	// Allocate the shared_ptr so property_dialog_destroyed can free the param safely
 	f->properties_dialog_open = std::make_shared<std::atomic<unsigned int>>(0u);
 	f->update_properties = {true};
@@ -552,7 +551,7 @@ void *ndi_filter_create_audioonly(obs_data_t *settings, obs_source_t *obs_source
 
 	auto f = (ndi_filter_t *)bzalloc(sizeof(ndi_filter_t));
 	f->is_audioonly = true;
-	
+
 	// Allocate the shared_ptr so property_dialog_destroyed can free the param safely
 	f->properties_dialog_open = std::make_shared<std::atomic<unsigned int>>(0u);
 	f->update_properties = {true};

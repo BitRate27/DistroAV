@@ -530,13 +530,13 @@ void obs_module_post_load(void)
 void obs_module_unload(void)
 {
 	obs_log(LOG_DEBUG, "+obs_module_unload()");
-	
+
 	if (network_monitor) {
 		// Use delete so NetworkMonitor destructor runs and stops the background thread.
 		delete network_monitor;
 		network_monitor = nullptr;
 	}
-	
+
 	updateCheckStop();
 
 	if (ndiLib) {

@@ -183,14 +183,15 @@ struct NdiAdapterInfo {
 	std::string ipv4Address;
 	std::string subnetMask;
 	IF_LUID luid;
-	NicSample lastSample = {0,0,0,0,0};
+	NicSample lastSample = {0, 0, 0, 0, 0};
 	double inBps = 0.0;
 	double outBps = 0.0;
 	double receiveSpeed = 0.0;
 	double transmitSpeed = 0.0;
 	bool isUp = false;
-	bool supportsMulticast = false; // Static capability (IP_ADAPTER_NO_MULTICAST) - NOT a live test; see multicastJoinOk below
-	bool looksVirtual = false;      // VPN / Hyper-V / VMware / loopback / Teredo etc.
+	bool supportsMulticast =
+		false; // Static capability (IP_ADAPTER_NO_MULTICAST) - NOT a live test; see multicastJoinOk below
+	bool looksVirtual = false; // VPN / Hyper-V / VMware / loopback / Teredo etc.
 	ULONG ifType = 0;
 	bool ndiCandidate;
 	NdiNetworkCategory networkCategory = NdiNetworkCategory::Unknown;

@@ -259,8 +259,9 @@ QVariant NdiAdapterTableModel::data(const QModelIndex &index, int role) const
 	if (role == Qt::DisplayRole || wantsSortValue) {
 		switch (index.column()) {
 		case ColNDI:
-			return wantsSortValue ? QVariant(a.ndiCandidate) : QVariant(a.ndiCandidate ? tr("Yes") : tr("No"));
-			
+			return wantsSortValue ? QVariant(a.ndiCandidate)
+					      : QVariant(a.ndiCandidate ? tr("Yes") : tr("No"));
+
 		case ColFriendlyName:
 			return QString::fromStdString(a.friendlyName);
 		case ColDescription:
@@ -273,35 +274,37 @@ QVariant NdiAdapterTableModel::data(const QModelIndex &index, int role) const
 			return wantsSortValue ? QVariant(a.isUp) : QVariant(a.isUp ? tr("Yes") : tr("No"));
 		case ColSupportsMulticast:
 			return wantsSortValue ? QVariant(a.supportsMulticast)
-					       : QVariant(a.supportsMulticast ? tr("Yes") : tr("No"));
-       case ColJoin:
+					      : QVariant(a.supportsMulticast ? tr("Yes") : tr("No"));
+		case ColJoin:
 			return wantsSortValue ? QVariant(a.multicastJoinOk)
-						   : QVariant(a.multicastJoinOk ? tr("Yes") : tr("No"));
-       case ColRoundTrip:
+					      : QVariant(a.multicastJoinOk ? tr("Yes") : tr("No"));
+		case ColRoundTrip:
 			return wantsSortValue ? QVariant(a.multicastRoundTripOk)
-						   : QVariant(a.multicastRoundTripOk ? tr("Yes") : tr("No"));
+					      : QVariant(a.multicastRoundTripOk ? tr("Yes") : tr("No"));
 		case ColLooksVirtual:
-			return wantsSortValue ? QVariant(a.looksVirtual) : QVariant(a.looksVirtual ? tr("Yes") : tr("No"));
-       case ColNetworkCategory:
+			return wantsSortValue ? QVariant(a.looksVirtual)
+					      : QVariant(a.looksVirtual ? tr("Yes") : tr("No"));
+		case ColNetworkCategory:
 			return wantsSortValue ? QVariant(static_cast<int>(a.networkCategory))
-							  : QVariant(networkCategoryName(a.networkCategory));
+					      : QVariant(networkCategoryName(a.networkCategory));
 		case ColFirewallEnabled: {
 			const bool applicable = (a.networkCategory != NdiNetworkCategory::Unknown);
 			return wantsSortValue ? QVariant(yesNoOrNASortValue(applicable, a.firewallEnabled))
-					       : QVariant(yesNoOrNA(applicable, a.firewallEnabled));
+					      : QVariant(yesNoOrNA(applicable, a.firewallEnabled));
 		}
 		case ColMdnsPortOpen:
 			return wantsSortValue ? QVariant(static_cast<int>(a.mdnsPortOpen))
-					       : QVariant(firewallPortAccessName(a.mdnsPortOpen));
+					      : QVariant(firewallPortAccessName(a.mdnsPortOpen));
 		case ColNdiPortsOpen:
 			return wantsSortValue ? QVariant(static_cast<int>(a.ndiPortsOpen))
-					       : QVariant(firewallPortAccessName(a.ndiPortsOpen));
+					      : QVariant(firewallPortAccessName(a.ndiPortsOpen));
 		case ColFilePrinterSharing:
 			return wantsSortValue ? QVariant(static_cast<int>(a.filePrinterSharing))
-					       : QVariant(firewallPortAccessName(a.filePrinterSharing));
+					      : QVariant(firewallPortAccessName(a.filePrinterSharing));
 		case ColIfType:
-			return wantsSortValue ? QVariant(static_cast<uint>(a.ifType))
-					       : QVariant(QStringLiteral("%1 (%2)").arg(a.ifType).arg(ifTypeName(a.ifType)));
+			return wantsSortValue
+				       ? QVariant(static_cast<uint>(a.ifType))
+				       : QVariant(QStringLiteral("%1 (%2)").arg(a.ifType).arg(ifTypeName(a.ifType)));
 		case ColInBps:
 			return wantsSortValue ? QVariant(a.inBps) : QVariant(formatBps(a.inBps));
 		case ColOutBps:
@@ -320,8 +323,8 @@ QVariant NdiAdapterTableModel::data(const QModelIndex &index, int role) const
 		case ColNDI:
 		case ColIsUp:
 		case ColSupportsMulticast:
-       case ColJoin:
-       case ColRoundTrip:
+		case ColJoin:
+		case ColRoundTrip:
 		case ColLooksVirtual:
 		case ColFirewallEnabled:
 		case ColMdnsPortOpen:
@@ -329,7 +332,7 @@ QVariant NdiAdapterTableModel::data(const QModelIndex &index, int role) const
 		case ColFilePrinterSharing:
 			// Center Yes/No/N/A style columns
 			return QVariant(Qt::AlignHCenter | Qt::AlignVCenter);
-       case ColNetworkCategory:
+		case ColNetworkCategory:
 			return QVariant(Qt::AlignLeft | Qt::AlignVCenter);
 		case ColIfType:
 		case ColInBps:
@@ -374,13 +377,13 @@ QVariant NdiAdapterTableModel::headerData(int section, Qt::Orientation orientati
 		return tr("Up");
 	case ColSupportsMulticast:
 		return tr("Multi");
-       case ColJoin:
-			return tr("Join");
-   case ColRoundTrip:
+	case ColJoin:
+		return tr("Join");
+	case ColRoundTrip:
 		return tr("Rtrip");
 	case ColLooksVirtual:
 		return tr("Virt");
-     case ColNetworkCategory:
+	case ColNetworkCategory:
 		return tr("Cat");
 	case ColFirewallEnabled:
 		return tr("FW");
@@ -428,8 +431,8 @@ NdiAdapterTableWidget::NdiAdapterTableWidget(QWidget *parent)
 	// Get the NdiNetworkMonitor singleton instance and get the current network report.
 	NdiNetworkReport report = network_monitor->getNetworkReport();
 
-    // Row of read-only checkboxes showing diagnostic flags.
- auto makeFlag = [this](const QString &text, bool checked) {
+	// Row of read-only checkboxes showing diagnostic flags.
+	auto makeFlag = [this](const QString &text, bool checked) {
 		auto *cb = new QCheckBox(text, this);
 		cb->setChecked(checked);
 		cb->setEnabled(false);
@@ -437,18 +440,18 @@ NdiAdapterTableWidget::NdiAdapterTableWidget(QWidget *parent)
 		return cb;
 	};
 
-  QGroupBox *mdnsGroup = new QGroupBox(tr("mDNS  / multicast discovery"), this);
+	QGroupBox *mdnsGroup = new QGroupBox(tr("mDNS  / multicast discovery"), this);
 	auto *mdnsLayout = new QHBoxLayout(mdnsGroup);
 	mdnsLayout->setContentsMargins(6, 14, 6, 4);
 	mdnsLayout->setSpacing(6);
-  m_mdnsBindCheckBox = makeFlag("mDNS bind OK", report.mdnsSocketBindOk);
+	m_mdnsBindCheckBox = makeFlag("mDNS bind OK", report.mdnsSocketBindOk);
 	m_mdnsPortCheckBox = makeFlag("mDNS port not in use", !report.mdnsPortInUse);
-  m_avahiStatusLabel = new QLabel(this);
+	m_avahiStatusLabel = new QLabel(this);
 	m_avahiStatusLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 	m_avahiStatusLabel->setText(avahiStatusLabelText(report.avahiStatus));
 	mdnsLayout->addWidget(m_mdnsBindCheckBox, 1, Qt::AlignCenter);
 	mdnsLayout->addWidget(m_mdnsPortCheckBox, 1, Qt::AlignCenter);
- mdnsLayout->addWidget(m_avahiStatusLabel, 1, Qt::AlignCenter);
+	mdnsLayout->addWidget(m_avahiStatusLabel, 1, Qt::AlignCenter);
 	mdnsGroup->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
 	// File & Printer Sharing and ICMP Echo used to have their own QGroupBox
@@ -457,8 +460,8 @@ NdiAdapterTableWidget::NdiAdapterTableWidget(QWidget *parent)
 	// for why the old machine-wide check was misleading on a multi-adapter
 	// machine.
 	QHBoxLayout *flagsLayout = new QHBoxLayout();
-  flagsLayout->setContentsMargins(0, 0, 0, 0);
-    flagsLayout->setSpacing(8);
+	flagsLayout->setContentsMargins(0, 0, 0, 0);
+	flagsLayout->setSpacing(8);
 	flagsLayout->addWidget(mdnsGroup, 1);
 	layout->addLayout(flagsLayout);
 	m_proxyModel->setSourceModel(m_model);
@@ -487,17 +490,16 @@ NdiAdapterTableWidget::NdiAdapterTableWidget(QWidget *parent)
 	header->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(header, &QHeaderView::customContextMenuRequested, this, &NdiAdapterTableWidget::showHeaderContextMenu);
 
-
-	layout->setContentsMargins(0,0,0,0);
+	layout->setContentsMargins(0, 0, 0, 0);
 	// Let the table expand to take available space; footer will keep its size.
 	m_tableView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 	layout->addWidget(m_tableView);
 	// Give the table stretch so it keeps space when the dialog lays out widgets.
-	layout->setStretch(0,1);
-	
+	layout->setStretch(0, 1);
+
 	// Footer with Copy and OK buttons. OK closes the top-level window (dialog).
 	QHBoxLayout *footer = new QHBoxLayout();
-	footer->setContentsMargins(0,6,0,0);
+	footer->setContentsMargins(0, 6, 0, 0);
 	footer->setSpacing(8);
 	footer->addStretch();
 	QPushButton *copyBtn = new QPushButton(tr("Copy"), this);
@@ -511,7 +513,7 @@ NdiAdapterTableWidget::NdiAdapterTableWidget(QWidget *parent)
 	footer->setAlignment(Qt::AlignRight);
 
 	layout->addLayout(footer);
-	
+
 	// Copy button: build a tab-separated representation including headers and put it on the clipboard.
 	connect(copyBtn, &QPushButton::clicked, this, [this]() {
 		std::string text = "`\n" + network_monitor->getFormattedAdapterReport() + "\n`";
@@ -533,7 +535,7 @@ void NdiAdapterTableWidget::refreshDiagnosticFlags()
 	NdiNetworkReport report = network_monitor->getNetworkReport();
 	if (m_mdnsBindCheckBox)
 		m_mdnsBindCheckBox->setChecked(report.mdnsSocketBindOk);
- if (m_mdnsPortCheckBox)
+	if (m_mdnsPortCheckBox)
 		m_mdnsPortCheckBox->setChecked(!report.mdnsPortInUse);
 	if (m_avahiStatusLabel)
 		m_avahiStatusLabel->setText(avahiStatusLabelText(report.avahiStatus));
@@ -548,7 +550,7 @@ NdiAdapterTableWidget::~NdiAdapterTableWidget()
 }
 void NdiAdapterTableWidget::setAdapters(const std::vector<NdiAdapterInfo> &adapters)
 {
- refreshDiagnosticFlags();
+	refreshDiagnosticFlags();
 	m_model->setAdapters(adapters);
 	m_tableView->resizeColumnsToContents();
 
@@ -557,7 +559,7 @@ void NdiAdapterTableWidget::setAdapters(const std::vector<NdiAdapterInfo> &adapt
 	// apply it after resizing to contents so it is not overwritten.
 	QFontMetrics fm(m_tableView->font());
 	int charWidth = fm.horizontalAdvance(QLatin1Char('0'));
-	int bpsPixels = charWidth *11 +16; // add padding for cell margins
+	int bpsPixels = charWidth * 11 + 16; // add padding for cell margins
 	m_tableView->setColumnWidth(NdiAdapterTableModel::ColInBps, bpsPixels);
 	m_tableView->setColumnWidth(NdiAdapterTableModel::ColOutBps, bpsPixels);
 	m_tableView->setColumnWidth(NdiAdapterTableModel::ColReceiveSpeed, bpsPixels);

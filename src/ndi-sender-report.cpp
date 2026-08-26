@@ -22,9 +22,7 @@
 #include <string>
 
 // Constructor
-SenderInfo::SenderInfo(NDIlib_send_instance_t sender)
-: m_sender(sender),
-tag(""), ndi_name(""), running(), snapshot()
+SenderInfo::SenderInfo(NDIlib_send_instance_t sender) : m_sender(sender), tag(""), ndi_name(""), running(), snapshot()
 {
 }
 
@@ -134,7 +132,7 @@ std::string SenderInfo::get_missing_sender_status()
 
 // Called when a video frame is submitted to the NDI send API.
 void SenderInfo::send_video_frame(uint64_t t0, uint64_t t1, uint64_t t2, NDIlib_video_frame_v2_t &ndi_frame,
-				 video_data *)
+				  video_data *)
 {
 	std::lock_guard<std::mutex> lock(m_mutex);
 
@@ -206,7 +204,8 @@ void SenderInfo::calculate_stats()
 			snapshot.osFPS = dfps;
 		}
 
-		elapsedSeconds = (double)(snapshot.last_video_frame_timestamp - snapshot.start_video_frame_timestamp) / 1e9;
+		elapsedSeconds =
+			(double)(snapshot.last_video_frame_timestamp - snapshot.start_video_frame_timestamp) / 1e9;
 		if (elapsedSeconds > 0.0) {
 			double dfps = (double)snapshot.video_frame_count / elapsedSeconds;
 			snapshot.tsFPS = dfps;
@@ -225,7 +224,8 @@ void SenderInfo::calculate_stats()
 			double dsps = (double)snapshot.audio_sample_count / elapsedSeconds;
 			snapshot.osSPS = dsps;
 		}
-		elapsedSeconds = (double)(snapshot.last_audio_sample_timestamp - snapshot.start_audio_sample_timestamp) / 1e9;
+		elapsedSeconds =
+			(double)(snapshot.last_audio_sample_timestamp - snapshot.start_audio_sample_timestamp) / 1e9;
 		if (elapsedSeconds > 0.0) {
 			double dsps = (double)snapshot.audio_sample_count / elapsedSeconds;
 			snapshot.tsSPS = dsps;
@@ -240,14 +240,15 @@ void SenderInfo::calculate_stats()
 		snapshot.budget_used_per_frame_blocking = snapshot.avg_video_send_block / (1e9 / snapshot.target_fps);
 		snapshot.budget_used_per_frame_processing = snapshot.avg_video_processing / (1e9 / snapshot.target_fps);
 	}
-	
+
 	snapshot.deficit_sps = 0.0;
 	if (snapshot.target_sps > 0)
 		snapshot.deficit_sps = ((snapshot.target_sps - snapshot.osSPS) / snapshot.target_sps);
 
 	snapshot.jitter_ratio = 0.0;
 	if (snapshot.avg_frame_interval > 0)
-		snapshot.jitter_ratio = snapshot.max_frame_interval / snapshot.avg_frame_interval; // TODO: reset max_frame_interval periodically?
+		snapshot.jitter_ratio = snapshot.max_frame_interval /
+					snapshot.avg_frame_interval; // TODO: reset max_frame_interval periodically?
 
 	snapshot.format_description = network_monitor->getFormatDescription(
 		snapshot.xres, snapshot.yres, snapshot.frame_rate_D, snapshot.frame_rate_N, snapshot.fourcc);
@@ -272,13 +273,12 @@ void SenderInfo::calculate_stats()
 					    ndi_source_list.end();
 			if (discoverable != snapshot.discoverable) {
 				{
-					std::lock_guard<std::mutex> lock(m_mutex);	
+					std::lock_guard<std::mutex> lock(m_mutex);
 					running.discoverable_changes++;
 					running.discoverable = discoverable;
-				}			
+				}
 				set_discoverable(discoverable);
 			}
-
 		}
 	}
 }
