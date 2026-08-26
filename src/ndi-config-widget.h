@@ -369,7 +369,7 @@ private:
 
 		m_allowedAdapters->clear();
 		const QJsonArray allowed = childObj(ndi, "adapters").value("allowed").toArray();
-		for (const QJsonValue &v : allowed)
+		for (const QJsonValue v : allowed)
 			m_allowedAdapters->addItem(v.toString());
 	}
 
