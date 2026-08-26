@@ -1186,8 +1186,11 @@ static bool TestMulticastRoundTrip(int s, const std::string &adapterIp)
 		if (received <= 0)
 			continue;
 
-		if (payload.size() == static_cast<size_t>(received) && memcmp(buf, payload.data(), received) == 0)
-			return true; // our own probe came back - the round trip succeeded
+		if (payload.size() == static_cast<size_t>(received) && memcmp(buf, payload.data(), received) == 0) {
+			// our own probe came back - the round trip succeeded
+			return true;
+		}
+
 		// else: not our packet - loop and keep waiting until the deadline
 	}
 
