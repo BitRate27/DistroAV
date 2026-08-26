@@ -526,7 +526,7 @@ void *ndi_filter_create(obs_data_t *settings, obs_source_t *obs_source)
 
 	// Allocate the shared_ptr so property_dialog_destroyed can free the param safely
 	f->properties_dialog_open = std::make_shared<std::atomic<unsigned int>>(0u);
-	f->update_properties = {true};
+	f->update_properties = true;
 
 	f->texrender = gs_texrender_create(TEXFORMAT, GS_ZS_NONE);
 
@@ -554,7 +554,7 @@ void *ndi_filter_create_audioonly(obs_data_t *settings, obs_source_t *obs_source
 
 	// Allocate the shared_ptr so property_dialog_destroyed can free the param safely
 	f->properties_dialog_open = std::make_shared<std::atomic<unsigned int>>(0u);
-	f->update_properties = {true};
+	f->update_properties = true;
 
 	f->obs_source = obs_source;
 	pthread_mutex_init(&f->ndi_sender_audio_mutex, NULL);

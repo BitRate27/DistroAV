@@ -1268,7 +1268,7 @@ void *ndi_source_create(obs_data_t *settings, obs_source_t *obs_source)
 	s->ndi_receiver_info = network_monitor->registerReceiver(obs_source);
 
 	s->properties_dialog_open = std::make_shared<std::atomic<unsigned int>>(0u);
-	s->update_properties = {true};
+	s->update_properties = true;
 	s->change_notifier = new ChangeNotifier([s]() { s->update_properties.store(true); });
 	s->ndi_receiver_info->registerChangeNotifier(s->change_notifier, "ndi-source");
 	ndi_source_update(s, settings);
