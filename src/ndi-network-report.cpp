@@ -27,6 +27,8 @@
 #include <algorithm> // for std::any_of
 #include <chrono>    // for TestMulticastRoundTrip()'s poll deadline
 #include <random>    // for TestMulticastRoundTrip()'s probe token
+#include <utility>   // for std::pair - g_multicastMemberships' key
+#include <mutex>     // for g_multicastMembershipsMutex
 
 #ifdef _WIN32
 
@@ -1197,8 +1199,165 @@ static bool TestMulticastRoundTrip(int s, const std::string &adapterIp)
 	return false;
 }
 
-// Try to bind UDP 5353 and join the mDNS multicast group to see whether mDNS
-// traffic is likely to work on this machine (not blocked by firewall/driver).
+// Holds one (adapter, IPv4 address) pair's multicast group membership -
+// see the big comment on TestMdns() below for why this is joined once and
+// held indefinitely rather than joined/dropped every tick. Keyed by
+// (luid.Value, ipv4Address) rather than just the LUID, matching
+// EnumerateAdapters()'s granularity of one NdiAdapterInfo per unicast
+// address - a multi-homed adapter with more than one IPv4 address gets
+// tracked (and joined) independently per address, same as before this
+// change.
+//
+// TestMdns()/DiagnoseNdiNetwork() normally only ever run on
+// NetworkMonitor's single background thread (monitorLoop()), but
+// NetworkMonitor's constructor also makes one synchronous
+// DiagnoseNdiNetwork() call of its own right as that background thread is
+// starting up (see network-monitor.cpp), so there's a brief real window
+// where both could touch this map concurrently - hence the mutex, rather
+// than assuming single-threaded access.
+#ifdef _WIN32
+struct PersistedMulticastMembership {
+	SOCKET sock = INVALID_SOCKET;
+};
+#else
+struct PersistedMulticastMembership {
+	int sock = -1;
+};
+#endif
+
+static std::mutex g_multicastMembershipsMutex;
+static std::map<std::pair<uint64_t, std::string>, PersistedMulticastMembership> g_multicastMemberships;
+
+// Returns a socket that has already joined 224.0.0.251 through adapter
+// `a`'s interface - creating one and joining it, if this (adapter, IP)
+// pair hasn't been seen before, and holding onto it in
+// g_multicastMemberships for every subsequent call rather than dropping
+// membership afterward. Returns INVALID_SOCKET/-1 on failure (caller
+// treats that as "join failed", same as before this change).
+#ifdef _WIN32
+static SOCKET EnsureMulticastMembership(const NdiAdapterInfo &a)
+#else
+static int EnsureMulticastMembership(const NdiAdapterInfo &a)
+#endif
+{
+	const auto key = std::make_pair(a.luid.Value, a.ipv4Address);
+
+	std::lock_guard<std::mutex> lock(g_multicastMembershipsMutex);
+
+	auto it = g_multicastMemberships.find(key);
+	if (it != g_multicastMemberships.end())
+		return it->second.sock;
+
+#ifdef _WIN32
+	WSADATA wsa;
+	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+		return INVALID_SOCKET;
+
+	SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (s == INVALID_SOCKET) {
+		WSACleanup();
+		return INVALID_SOCKET;
+	}
+	BOOL reuse = TRUE;
+#else
+	int s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (s < 0)
+		return -1;
+	int reuse = 1;
+#endif
+	setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuse, sizeof(reuse));
+#if !defined(_WIN32) && defined(SO_REUSEPORT)
+	setsockopt(s, SOL_SOCKET, SO_REUSEPORT, (const char *)&reuse, sizeof(reuse));
+#endif
+
+	// Multiple sockets (one per held membership, plus TestMdns()'s own
+	// short-lived bind-test socket) all bind the same local port
+	// 0.0.0.0:5353 concurrently - SO_REUSEADDR above is what makes that
+	// legal, the same sharing mechanism that already lets this plugin
+	// coexist with Bonjour/NDI's own runtime on the same port.
+	sockaddr_in addr{};
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(5353);
+	addr.sin_addr.s_addr = INADDR_ANY;
+	if (bind(s, (sockaddr *)&addr, sizeof(addr)) != 0) {
+#ifdef _WIN32
+		closesocket(s);
+		WSACleanup();
+		return INVALID_SOCKET;
+#else
+		close(s);
+		return -1;
+#endif
+	}
+
+	ip_mreq mreq{};
+	inet_pton(AF_INET, "224.0.0.251", &mreq.imr_multiaddr);
+	inet_pton(AF_INET, a.ipv4Address.c_str(), &mreq.imr_interface);
+	if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char *)&mreq, sizeof(mreq)) != 0) {
+#ifdef _WIN32
+		closesocket(s);
+		WSACleanup();
+		return INVALID_SOCKET;
+#else
+		close(s);
+		return -1;
+#endif
+	}
+
+	PersistedMulticastMembership membership;
+	membership.sock = s;
+	g_multicastMemberships[key] = membership;
+	return s;
+}
+
+// Drops and closes membership for every (adapter, IP) pair that isn't in
+// `currentAdapters` at all - i.e. the adapter was actually unplugged/
+// disabled, not just currently down or otherwise non-qualifying. An
+// adapter that's merely down but still enumerated keeps its held
+// membership, so it doesn't need to rejoin if the link comes back.
+static void DropVanishedMulticastMemberships(const std::vector<NdiAdapterInfo> &currentAdapters)
+{
+	std::lock_guard<std::mutex> lock(g_multicastMembershipsMutex);
+
+	for (auto it = g_multicastMemberships.begin(); it != g_multicastMemberships.end();) {
+		const auto &key = it->first;
+		const bool stillPresent =
+			std::any_of(currentAdapters.begin(), currentAdapters.end(), [&key](const NdiAdapterInfo &a) {
+				return a.luid.Value == key.first && a.ipv4Address == key.second;
+			});
+
+		if (stillPresent) {
+			++it;
+			continue;
+		}
+
+#ifdef _WIN32
+		closesocket(it->second.sock);
+		WSACleanup(); // pairs with the WSAStartup() in EnsureMulticastMembership()
+#else
+		close(it->second.sock);
+#endif
+		it = g_multicastMemberships.erase(it);
+	}
+}
+
+// Binds a fresh, short-lived UDP socket to port 5353 on every call, purely
+// to answer "can we bind this port right now" (mdnsSocketBindOk /
+// mdnsPortInUse) - that part still needs to run every tick, since it's
+// just a local bind() call that doesn't touch the adapter/driver.
+//
+// Multicast group membership itself is different: it's joined ONCE per
+// (adapter, IP) pair and held open indefinitely (see
+// EnsureMulticastMembership()/g_multicastMemberships above), rather than
+// joined and dropped every tick the way this function used to work.
+// Cycling IP_ADD_MEMBERSHIP/IP_DROP_MEMBERSHIP on a live NIC once a
+// second, forever, sends a real IGMP join/leave onto the wire and
+// triggers an OID_802_3_MULTICAST_LIST update to the NIC driver every
+// time - on some chipsets this was observed to cause genuine periodic
+// drops in the adapter's actual throughput, visible in Windows' own Task
+// Manager graph (independent of anything this plugin itself measures or
+// displays). The round-trip probe below still runs every tick, same as
+// before - only the join/leave cycling changed.
 static void TestMdns(NdiNetworkReport &report)
 {
 #ifdef _WIN32
@@ -1206,14 +1365,14 @@ static void TestMdns(NdiNetworkReport &report)
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 		return;
 
-	SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (s == INVALID_SOCKET) {
+	SOCKET bindTestSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (bindTestSocket == INVALID_SOCKET) {
 		WSACleanup();
 		return;
 	}
 #else
-	int s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (s < 0)
+	int bindTestSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (bindTestSocket < 0)
 		return;
 #endif
 
@@ -1222,12 +1381,12 @@ static void TestMdns(NdiNetworkReport &report)
 #else
 	int reuse = 1;
 #endif
-	setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuse, sizeof(reuse));
+	setsockopt(bindTestSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuse, sizeof(reuse));
 #if !defined(_WIN32) && defined(SO_REUSEPORT)
 	// Some mDNS responders (Avahi, mDNSResponder) bind with SO_REUSEPORT
 	// rather than SO_REUSEADDR; set both so this bind-test matches how a
 	// real responder would actually behave.
-	setsockopt(s, SOL_SOCKET, SO_REUSEPORT, (const char *)&reuse, sizeof(reuse));
+	setsockopt(bindTestSocket, SOL_SOCKET, SO_REUSEPORT, (const char *)&reuse, sizeof(reuse));
 #endif
 
 	sockaddr_in addr{};
@@ -1235,7 +1394,7 @@ static void TestMdns(NdiNetworkReport &report)
 	addr.sin_port = htons(5353);
 	addr.sin_addr.s_addr = INADDR_ANY;
 
-	int bindResult = bind(s, (sockaddr *)&addr, sizeof(addr));
+	int bindResult = bind(bindTestSocket, (sockaddr *)&addr, sizeof(addr));
 	if (bindResult == 0) {
 		report.mdnsSocketBindOk = true;
 	} else {
@@ -1252,28 +1411,32 @@ static void TestMdns(NdiNetworkReport &report)
 #endif
 	}
 
+#ifdef _WIN32
+	closesocket(bindTestSocket);
+	WSACleanup();
+#else
+	close(bindTestSocket);
+#endif
+
+	// Round-trip test every currently-qualifying adapter against its held
+	// (or newly-created) membership socket - see EnsureMulticastMembership().
 	for (auto &a : report.adapters) {
 		if (!a.isUp || a.looksVirtual || !a.supportsMulticast)
 			continue;
 
-		ip_mreq mreq{};
-		inet_pton(AF_INET, "224.0.0.251", &mreq.imr_multiaddr);
-		inet_pton(AF_INET, a.ipv4Address.c_str(), &mreq.imr_interface);
-
-		int joinResult = setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char *)&mreq, sizeof(mreq));
-		if (joinResult == 0) {
-			a.multicastJoinOk = true;
-			a.multicastRoundTripOk = TestMulticastRoundTrip(s, a.ipv4Address);
-			setsockopt(s, IPPROTO_IP, IP_DROP_MEMBERSHIP, (const char *)&mreq, sizeof(mreq));
-		}
+		auto s = EnsureMulticastMembership(a);
+#ifdef _WIN32
+		if (s == INVALID_SOCKET)
+			continue;
+#else
+		if (s < 0)
+			continue;
+#endif
+		a.multicastJoinOk = true;
+		a.multicastRoundTripOk = TestMulticastRoundTrip(s, a.ipv4Address);
 	}
 
-#ifdef _WIN32
-	closesocket(s);
-	WSACleanup();
-#else
-	close(s);
-#endif
+	DropVanishedMulticastMemberships(report.adapters);
 }
 
 #if defined(_WIN32)
