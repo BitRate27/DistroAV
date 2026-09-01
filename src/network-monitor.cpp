@@ -291,7 +291,7 @@ std::string NetworkMonitor::getReceiverStatus(ReceiverInfo *receiverInfo) const
 std::string getFormattedReceiverReport(const NetworkMonitor::ReceiverInfoMap &m_receivers)
 {
 	static const std::array<ReceiverColumnDef, 13> kColumns = {{
-		{"NDI Name", ""},		
+		{"NDI Name", ""},
 		{"OBS Source Name", ""},
 		{"Dropped", "frames"},
 		{"Queued", "frames"},
