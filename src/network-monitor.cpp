@@ -291,8 +291,8 @@ std::string NetworkMonitor::getReceiverStatus(ReceiverInfo *receiverInfo) const
 std::string getFormattedReceiverReport(const NetworkMonitor::ReceiverInfoMap &m_receivers)
 {
 	static const std::array<ReceiverColumnDef, 13> kColumns = {{
+		{"NDI Name", ""},		
 		{"OBS Source Name", ""},
-		{"NDI Name", ""},
 		{"Dropped", "frames"},
 		{"Queued", "frames"},
 		{"Format", ""},
@@ -318,17 +318,23 @@ std::string getFormattedReceiverReport(const NetworkMonitor::ReceiverInfoMap &m_
 	appendReceiverSeparator(out, widths, '-');
 	appendReceiverRow(out, headers, widths);
 	appendReceiverSeparator(out, widths, '=');
-	appendReceiverSeparator(out, widths, '-');
 
+	// m_receivers is keyed by obs_source_t*, so iterating it directly has
+	// no meaningful order - sort by NDI name for a stable, readable report.
+	std::vector<std::shared_ptr<ReceiverInfo>> sortedReceivers;
+	sortedReceivers.reserve(m_receivers.size());
 	for (const auto &pair : m_receivers) {
-		const auto &receiver = pair.second;
-		if (!receiver)
-			continue;
+		if (pair.second)
+			sortedReceivers.push_back(pair.second);
+	}
+	std::sort(sortedReceivers.begin(), sortedReceivers.end(),
+		  [](const auto &a, const auto &b) { return a->get_ndi_name() < b->get_ndi_name(); });
 
+	for (const auto &receiver : sortedReceivers) {
 		const auto snapshot = receiver->getReportSnapshot();
 		const std::array<std::string, 13> values = {{
-			snapshot.obs_source_name,
 			receiver->get_ndi_name(),
+			snapshot.obs_source_name,
 			std::to_string(snapshot.video_frames_dropped),
 			std::to_string(snapshot.video_queue_size),
 			snapshot.format_description,
@@ -343,7 +349,7 @@ std::string getFormattedReceiverReport(const NetworkMonitor::ReceiverInfoMap &m_
 		}};
 		appendReceiverRow(out, values, widths);
 	}
-
+	appendReceiverSeparator(out, widths, '-');
 	return out.str();
 }
 
@@ -376,13 +382,20 @@ std::string getFormattedSenderReport(const NetworkMonitor::SenderInfoMap &m_send
 	out << "NDI Sender Report\n";
 	appendReceiverSeparator(out, widths, '-');
 	appendReceiverRow(out, headers, widths);
-	appendReceiverSeparator(out, widths, '-');
+	appendReceiverSeparator(out, widths, '=');
 
+	// m_senders is keyed by NDIlib_send_instance_t, so iterating it directly
+	// has no meaningful order - sort by NDI name for a stable, readable report.
+	std::vector<std::shared_ptr<SenderInfo>> sortedSenders;
+	sortedSenders.reserve(m_senders.size());
 	for (const auto &pair : m_senders) {
-		const auto &sender = pair.second;
-		if (!sender)
-			continue;
+		if (pair.second)
+			sortedSenders.push_back(pair.second);
+	}
+	std::sort(sortedSenders.begin(), sortedSenders.end(),
+		  [](const auto &a, const auto &b) { return a->get_ndi_name() < b->get_ndi_name(); });
 
+	for (const auto &sender : sortedSenders) {
 		const auto snapshot = sender->getReportSnapshot();
 		const std::array<std::string, 13> values = {{
 			sender->get_ndi_name(),
@@ -401,7 +414,7 @@ std::string getFormattedSenderReport(const NetworkMonitor::SenderInfoMap &m_send
 		}};
 		appendReceiverRow(out, values, widths);
 	}
-
+	appendReceiverSeparator(out, widths, '-');
 	return out.str();
 }
 

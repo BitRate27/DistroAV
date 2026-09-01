@@ -261,7 +261,7 @@ NdiReceiverTableWidget::NdiReceiverTableWidget(QWidget *parent)
 
 	// Copy button: build a tab-separated representation including headers and put it on the clipboard.
 	connect(copyBtn, &QPushButton::clicked, this, []() {
-		std::string text = "`\n" + network_monitor->getFormattedReceiverReport() + "\n`";
+		std::string text = network_monitor->getFormattedReceiverReport();
 
 		QClipboard *clipboard = QApplication::clipboard();
 		clipboard->setText(QString::fromUtf8(text));
