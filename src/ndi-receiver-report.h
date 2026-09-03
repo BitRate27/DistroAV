@@ -58,6 +58,8 @@ struct NDIReceiverStats {
 	double deficit_sps = 0.0;                      // fraction of target SPS that was not achieved
 	double budget_used_per_frame_capture = 0.0;    // fraction of time spent in send per frame on average
 	double budget_used_per_frame_processing = 0.0; // fraction of time spent in processing per frame on average
+	double max_capture_pct = 0.0; // fraction of the target frame period used by the worst-case capture call
+	double max_process_pct = 0.0; // fraction of the target frame period used by the worst-case processing call
 
 	size_t audio_sample_count = 0;
 	uint64_t last_audio_sample_timestamp = 0;

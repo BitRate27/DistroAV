@@ -104,8 +104,12 @@ QVariant NdiSenderTableModel::data(const QModelIndex &index, int role) const
 			return QString::number(report.jitter_ratio, 'f', 2);
 		case ColBudgetUsedBlocking:
 			return percentFromFraction(report.budget_used_per_frame_blocking);
+		case ColMaxSendBlockPct:
+			return percentFromFraction(report.max_send_block_pct);
 		case ColBudgetUsedProcessing:
 			return percentFromFraction(report.budget_used_per_frame_processing);
+		case ColMaxProcessPct:
+			return percentFromFraction(report.max_process_pct);
 		case ColReceiverChanges:
 			return QVariant((qulonglong)report.receiver_changes);
 		case ColDiscoverableChanges:
@@ -141,8 +145,12 @@ QVariant NdiSenderTableModel::data(const QModelIndex &index, int role) const
 			return QVariant(report.jitter_ratio);
 		case ColBudgetUsedBlocking:
 			return QVariant(report.budget_used_per_frame_blocking);
+		case ColMaxSendBlockPct:
+			return QVariant(report.max_send_block_pct);
 		case ColBudgetUsedProcessing:
 			return QVariant(report.budget_used_per_frame_processing);
+		case ColMaxProcessPct:
+			return QVariant(report.max_process_pct);
 		case ColReceiverChanges:
 			return QVariant((qulonglong)report.receiver_changes);
 		case ColDiscoverableChanges:
@@ -189,8 +197,12 @@ QVariant NdiSenderTableModel::headerData(int section, Qt::Orientation orientatio
 		return QStringLiteral("Jitter Ratio");
 	case ColBudgetUsedBlocking:
 		return QStringLiteral("Send Block %");
+	case ColMaxSendBlockPct:
+		return QStringLiteral("Max Send Block %");
 	case ColBudgetUsedProcessing:
 		return QStringLiteral("Processing %");
+	case ColMaxProcessPct:
+		return QStringLiteral("Max Processing %");
 	case ColReceiverChanges:
 		return QStringLiteral("Recvr Changes");
 	case ColDiscoverableChanges:

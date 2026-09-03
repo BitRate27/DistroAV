@@ -51,6 +51,8 @@ struct NDISenderStats {
 	double deficit_sps = 0.0;                      // fraction of target SPS that was not achieved
 	double budget_used_per_frame_blocking = 0.0;   // fraction of time spent in send per frame on average
 	double budget_used_per_frame_processing = 0.0; // fraction of time spent in processing per frame on average
+	double max_send_block_pct = 0.0; // fraction of the target frame period used by the worst-case send-block call
+	double max_process_pct = 0.0;    // fraction of the target frame period used by the worst-case processing call
 	size_t audio_sample_count = 0;
 	uint64_t last_audio_sample_timestamp = 0;
 	uint64_t last_audio_sample_os = 0;
@@ -64,8 +66,10 @@ struct NDISenderStats {
 	uint64_t avg_frame_interval = 0; // rolling avg of callback deltas
 	double jitter_ratio = 0.0;
 	uint64_t tot_video_send_block = 0; // time inside NDIlib_send_send_video_*
+	uint64_t max_video_send_block = 0; // worst-case send-block time in window
 	uint64_t avg_video_send_block = 0; // rolling avg of send block times
 	uint64_t tot_video_processing = 0; // time spent in video processing (e.g., color conversion)
+	uint64_t max_video_processing = 0; // worst-case processing time in window
 	uint64_t avg_video_processing = 0; // rolling avg of video processing times
 };
 

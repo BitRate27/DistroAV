@@ -46,7 +46,9 @@ public:
 		ColDeficitSPS,
 		ColJitterRatio,
 		ColBudgetUsedPerFrameCapture,
+		ColMaxCapturePct,
 		ColBudgetUsedPerFrameProcessing,
+		ColMaxProcessPct,
 		ColAvDriftMsPerHour,
 		ColumnCount
 	};

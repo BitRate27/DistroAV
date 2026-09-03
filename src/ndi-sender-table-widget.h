@@ -45,7 +45,9 @@ public:
 		ColSpsDeficit,
 		ColJitterRatio,
 		ColBudgetUsedBlocking,
+		ColMaxSendBlockPct,
 		ColBudgetUsedProcessing,
+		ColMaxProcessPct,
 		ColReceiverChanges,
 		ColDiscoverableChanges,
 		ColumnCount

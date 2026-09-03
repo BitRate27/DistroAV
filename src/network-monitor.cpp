@@ -85,7 +85,9 @@ std::array<std::size_t, N> computeReceiverWidths(const std::array<ReceiverColumn
 			formatFixed2(snapshot.deficit_sps),
 			formatFixed2(snapshot.jitter_ratio),
 			formatFixed2(snapshot.budget_used_per_frame_capture),
+			formatFixed2(snapshot.max_capture_pct),
 			formatFixed2(snapshot.budget_used_per_frame_processing),
+			formatFixed2(snapshot.max_process_pct),
 			formatFixed2(snapshot.av_drift_ns_per_hour / 1000000.0),
 		}};
 		for (std::size_t i = 0; i < N; ++i)
@@ -117,7 +119,9 @@ std::array<std::size_t, N> computeSenderWidths(const std::array<SenderColumnDef,
 			formatFixed2(snapshot.deficit_sps),
 			formatFixed2(snapshot.jitter_ratio),
 			formatFixed2(snapshot.budget_used_per_frame_blocking),
+			formatFixed2(snapshot.max_send_block_pct),
 			formatFixed2(snapshot.budget_used_per_frame_processing),
+			formatFixed2(snapshot.max_process_pct),
 			std::to_string(snapshot.receiver_changes),
 			std::to_string(snapshot.discoverable_changes),
 		}};
@@ -290,7 +294,7 @@ std::string NetworkMonitor::getReceiverStatus(ReceiverInfo *receiverInfo) const
 
 std::string getFormattedReceiverReport(const NetworkMonitor::ReceiverInfoMap &m_receivers)
 {
-	static const std::array<ReceiverColumnDef, 13> kColumns = {{
+	static const std::array<ReceiverColumnDef, 15> kColumns = {{
 		{"NDI Name", ""},
 		{"OBS Source Name", ""},
 		{"Dropped", "frames"},
@@ -302,7 +306,9 @@ std::string getFormattedReceiverReport(const NetworkMonitor::ReceiverInfoMap &m_
 		{"SPS Deficit %", "%"},
 		{"Jitter Ratio", "ratio"},
 		{"Capture %", "%"},
+		{"Max Capture %", "ratio"},
 		{"Process %", "%"},
+		{"Max Process %", "ratio"},
 		{"Drift ms/hr", "ms/hr"},
 	}};
 
@@ -332,7 +338,7 @@ std::string getFormattedReceiverReport(const NetworkMonitor::ReceiverInfoMap &m_
 
 	for (const auto &receiver : sortedReceivers) {
 		const auto snapshot = receiver->getReportSnapshot();
-		const std::array<std::string, 13> values = {{
+		const std::array<std::string, 15> values = {{
 			receiver->get_ndi_name(),
 			snapshot.obs_source_name,
 			std::to_string(snapshot.video_frames_dropped),
@@ -344,7 +350,9 @@ std::string getFormattedReceiverReport(const NetworkMonitor::ReceiverInfoMap &m_
 			formatFixed2(snapshot.deficit_sps),
 			formatFixed2(snapshot.jitter_ratio),
 			formatFixed2(snapshot.budget_used_per_frame_capture),
+			formatFixed2(snapshot.max_capture_pct),
 			formatFixed2(snapshot.budget_used_per_frame_processing),
+			formatFixed2(snapshot.max_process_pct),
 			formatFixed2(snapshot.av_drift_ns_per_hour / 1000000.0),
 		}};
 		appendReceiverRow(out, values, widths);
@@ -355,7 +363,7 @@ std::string getFormattedReceiverReport(const NetworkMonitor::ReceiverInfoMap &m_
 
 std::string getFormattedSenderReport(const NetworkMonitor::SenderInfoMap &m_senders)
 {
-	static const std::array<SenderColumnDef, 13> kColumns = {{
+	static const std::array<SenderColumnDef, 15> kColumns = {{
 		{"NDI name", ""},
 		{"Format", ""},
 		{"Recvrs", ""},
@@ -366,7 +374,9 @@ std::string getFormattedSenderReport(const NetworkMonitor::SenderInfoMap &m_send
 		{"SPS Deficit %", "%"},
 		{"Jitter Ratio", "ratio"},
 		{"Send Block %", "%"},
+		{"Max Send Block %", "ratio"},
 		{"Processing %", "%"},
+		{"Max Processing %", "ratio"},
 		{"Recvr Changes", ""},
 		{"Disc Changes", ""},
 	}};
@@ -397,7 +407,7 @@ std::string getFormattedSenderReport(const NetworkMonitor::SenderInfoMap &m_send
 
 	for (const auto &sender : sortedSenders) {
 		const auto snapshot = sender->getReportSnapshot();
-		const std::array<std::string, 13> values = {{
+		const std::array<std::string, 15> values = {{
 			sender->get_ndi_name(),
 			snapshot.format_description,
 			std::to_string(snapshot.receivers),
@@ -408,7 +418,9 @@ std::string getFormattedSenderReport(const NetworkMonitor::SenderInfoMap &m_send
 			formatFixed2(snapshot.deficit_sps),
 			formatFixed2(snapshot.jitter_ratio),
 			formatFixed2(snapshot.budget_used_per_frame_blocking),
+			formatFixed2(snapshot.max_send_block_pct),
 			formatFixed2(snapshot.budget_used_per_frame_processing),
+			formatFixed2(snapshot.max_process_pct),
 			std::to_string(snapshot.receiver_changes),
 			std::to_string(snapshot.discoverable_changes),
 		}};
@@ -440,8 +452,12 @@ void dumpSenderReportToLog(const NetworkMonitor::SenderInfoMap &m_senders)
 		obs_log(LOG_INFO, "%s '%s' Jitter Ratio: %.2f", reportHeader, ndi_name.c_str(), snapshot.jitter_ratio);
 		obs_log(LOG_INFO, "%s '%s' Send Block %%: %.2f", reportHeader, ndi_name.c_str(),
 			snapshot.budget_used_per_frame_blocking);
+		obs_log(LOG_INFO, "%s '%s' Max Send Block %%: %.2f", reportHeader, ndi_name.c_str(),
+			snapshot.max_send_block_pct);
 		obs_log(LOG_INFO, "%s '%s' Processing %%: %.2f", reportHeader, ndi_name.c_str(),
 			snapshot.budget_used_per_frame_processing);
+		obs_log(LOG_INFO, "%s '%s' Max Processing %%: %.2f", reportHeader, ndi_name.c_str(),
+			snapshot.max_process_pct);
 		obs_log(LOG_INFO, "%s '%s' Recvr Changes: %zu", reportHeader, ndi_name.c_str(),
 			snapshot.receiver_changes);
 		obs_log(LOG_INFO, "%s '%s' Disc Changes: %zu", reportHeader, ndi_name.c_str(),
@@ -518,8 +534,12 @@ void dumpReceiverReportToLog(const NetworkMonitor::ReceiverInfoMap &m_receivers)
 		obs_log(LOG_INFO, "%s '%s' Jitter Ratio: %.2f", reportHeader, ndi_name.c_str(), snapshot.jitter_ratio);
 		obs_log(LOG_INFO, "%s '%s' Capture %%: %.2f", reportHeader, ndi_name.c_str(),
 			snapshot.budget_used_per_frame_capture);
+		obs_log(LOG_INFO, "%s '%s' Max Capture %%: %.2f", reportHeader, ndi_name.c_str(),
+			snapshot.max_capture_pct);
 		obs_log(LOG_INFO, "%s '%s' Process %%: %.2f", reportHeader, ndi_name.c_str(),
 			snapshot.budget_used_per_frame_processing);
+		obs_log(LOG_INFO, "%s '%s' Max Process %%: %.2f", reportHeader, ndi_name.c_str(),
+			snapshot.max_process_pct);
 		obs_log(LOG_INFO, "%s '%s' Drift ms/hr: %.2f", reportHeader, ndi_name.c_str(),
 			snapshot.av_drift_ns_per_hour / 1000000.0);
 	}

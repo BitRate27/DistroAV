@@ -179,7 +179,9 @@ void ReceiverInfo::receive_video_frame(uint64_t t0, uint64_t t1, uint64_t t2, ND
 		running.frame_rate_D = ndi_frame.frame_rate_D;
 		running.frame_rate_N = ndi_frame.frame_rate_N;
 		running.tot_video_capture = 0;
+		running.max_video_capture = 0;
 		running.tot_video_processing = 0;
+		running.max_video_processing = 0;
 	}
 
 	if (running.last_video_frame_timestamp != 0) {
@@ -191,11 +193,13 @@ void ReceiverInfo::receive_video_frame(uint64_t t0, uint64_t t1, uint64_t t2, ND
 	running.last_video_frame_timestamp = ndi_frame.timestamp * 100ULL;
 	running.target_fps = (double)ndi_frame.frame_rate_N / (double)ndi_frame.frame_rate_D;
 
-	uint64_t capture_interval = t2 - t1;
+	uint64_t capture_interval = t1 - t0;
 	running.tot_video_capture += capture_interval;
+	running.max_video_capture = std::max<uint64_t>(running.max_video_capture, capture_interval);
 
-	uint64_t processing_interval = t1 - t0;
+	uint64_t processing_interval = t2 - t1;
 	running.tot_video_processing += processing_interval;
+	running.max_video_processing = std::max<uint64_t>(running.max_video_processing, processing_interval);
 
 	running.last_video_frame_os = t1;
 	++running.video_frame_count;
@@ -307,10 +311,18 @@ void ReceiverInfo::calculate_stats()
 	snapshot.deficit_fps = 0.0;
 	snapshot.budget_used_per_frame_capture = 0.0;
 	snapshot.budget_used_per_frame_processing = 0.0;
+	snapshot.max_capture_pct = 0.0;
+	snapshot.max_process_pct = 0.0;
 	if (snapshot.target_fps > 0) {
 		snapshot.deficit_fps = ((snapshot.target_fps - snapshot.osFPS) / snapshot.target_fps);
 		snapshot.budget_used_per_frame_capture = snapshot.avg_video_capture / (1e9 / snapshot.target_fps);
 		snapshot.budget_used_per_frame_processing = snapshot.avg_video_processing / (1e9 / snapshot.target_fps);
+
+		// Worst-case capture/processing time as a fraction of the target frame period
+		// (not divided by the average - so a max that equals one full frame period at
+		// the target fps always reads as 100%, regardless of how small the average is).
+		snapshot.max_capture_pct = (double)snapshot.max_video_capture / (1e9 / snapshot.target_fps);
+		snapshot.max_process_pct = (double)snapshot.max_video_processing / (1e9 / snapshot.target_fps);
 	}
 
 	snapshot.deficit_sps = 0.0;
@@ -319,8 +331,9 @@ void ReceiverInfo::calculate_stats()
 
 	snapshot.jitter_ratio = 0.0;
 	if (snapshot.avg_frame_interval > 0)
-		snapshot.jitter_ratio = snapshot.max_frame_interval /
-					snapshot.avg_frame_interval; // TODO: reset max_frame_interval periodically?
+		snapshot.jitter_ratio =
+			(double)snapshot.max_frame_interval /
+			(double)snapshot.avg_frame_interval; // TODO: reset max_frame_interval periodically?
 
 	snapshot.format_description = network_monitor->getFormatDescription(
 		snapshot.xres, snapshot.yres, snapshot.frame_rate_D, snapshot.frame_rate_N, snapshot.fourcc);

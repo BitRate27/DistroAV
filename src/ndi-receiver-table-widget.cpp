@@ -113,8 +113,12 @@ QVariant NdiReceiverTableModel::data(const QModelIndex &index, int role) const
 			return QString::number(report.jitter_ratio, 'f', 2);
 		case ColBudgetUsedPerFrameCapture:
 			return percentFromFraction(report.budget_used_per_frame_capture);
+		case ColMaxCapturePct:
+			return percentFromFraction(report.max_capture_pct);
 		case ColBudgetUsedPerFrameProcessing:
 			return percentFromFraction(report.budget_used_per_frame_processing);
+		case ColMaxProcessPct:
+			return percentFromFraction(report.max_process_pct);
 		case ColAvDriftMsPerHour:
 			return msFromNs(report.av_drift_ns_per_hour);
 		default:
@@ -146,8 +150,12 @@ QVariant NdiReceiverTableModel::data(const QModelIndex &index, int role) const
 			return QVariant(report.jitter_ratio);
 		case ColBudgetUsedPerFrameCapture:
 			return QVariant(report.budget_used_per_frame_capture);
+		case ColMaxCapturePct:
+			return QVariant(report.max_capture_pct);
 		case ColBudgetUsedPerFrameProcessing:
 			return QVariant(report.budget_used_per_frame_processing);
+		case ColMaxProcessPct:
+			return QVariant(report.max_process_pct);
 		case ColAvDriftMsPerHour:
 			return QVariant(report.av_drift_ns_per_hour / 1000000.0);
 		default:
@@ -164,7 +172,9 @@ QVariant NdiReceiverTableModel::data(const QModelIndex &index, int role) const
 		case ColDeficitSPS:
 		case ColJitterRatio:
 		case ColBudgetUsedPerFrameCapture:
+		case ColMaxCapturePct:
 		case ColBudgetUsedPerFrameProcessing:
+		case ColMaxProcessPct:
 		case ColAvDriftMsPerHour:
 			return QVariant(Qt::AlignRight | Qt::AlignVCenter);
 		default:
@@ -201,8 +211,12 @@ QVariant NdiReceiverTableModel::headerData(int section, Qt::Orientation orientat
 		return QStringLiteral("Jitter Ratio");
 	case ColBudgetUsedPerFrameCapture:
 		return QStringLiteral("Capture %");
+	case ColMaxCapturePct:
+		return QStringLiteral("Max Capture %");
 	case ColBudgetUsedPerFrameProcessing:
 		return QStringLiteral("Process %");
+	case ColMaxProcessPct:
+		return QStringLiteral("Max Process %");
 	case ColAvDriftMsPerHour:
 		return QStringLiteral("Drift ms/hr");
 	default:
