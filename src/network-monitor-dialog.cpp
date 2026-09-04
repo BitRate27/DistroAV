@@ -21,6 +21,7 @@
 #include "ndi-sender-table-widget.h"
 #include "ndi-receiver-table-widget.h"
 #include "ndi-config-widget.h"
+#include "config.h"
 
 #include <obs-frontend-api.h>
 
@@ -38,12 +39,42 @@
 #include <QPointer>
 #include <QClipboard>
 #include <QGuiApplication>
+#include <QScreen>
+#include <QEvent>
+
+namespace {
+// Watches the dialog for moves/resizes and persists its geometry to the user
+// config immediately, so the last position/size survives an OBS restart.
+class NetworkMonitorGeometryWatcher : public QObject {
+public:
+	using QObject::QObject;
+
+protected:
+	bool eventFilter(QObject *watched, QEvent *event) override
+	{
+		if (event->type() == QEvent::Move || event->type() == QEvent::Resize) {
+			if (auto *w = qobject_cast<QWidget *>(watched)) {
+				Config::Current()->SetNetworkMonitorGeometry(w->x(), w->y(), w->width(), w->height());
+			}
+		}
+		return QObject::eventFilter(watched, event);
+	}
+};
+} // namespace
 
 // This is used as a global by ndi-source.cpp / plugin-main.h; declared extern there.
 extern NetworkMonitor *network_monitor;
 static QPointer<QDialog> s_dialog;
+// Set just before close_network_monitor_dialog() closes the dialog for OBS
+// shutdown (OBS_FRONTEND_EVENT_EXIT), so the destroyed handler below knows not
+// to clear NetworkMonitorUp in that case - otherwise the dialog would never
+// auto-reopen on the next launch, since a normal OBS exit would always look
+// identical to the user explicitly closing it.
+static bool s_closingForAppExit = false;
 bool open_network_monitor_dialog()
 {
+	Config::Current()->NetworkMonitorUp(true);
+
 	if (s_dialog) {
 		s_dialog->show();
 		s_dialog->raise();
@@ -62,7 +93,12 @@ bool open_network_monitor_dialog()
 	dialog->setWindowModality(Qt::NonModal);
 	dialog->setMinimumSize(400, 100);
 	dialog->setSizeGripEnabled(true);
-	QObject::connect(dialog, &QObject::destroyed, []() { s_dialog = nullptr; });
+	QObject::connect(dialog, &QObject::destroyed, []() {
+		s_dialog = nullptr;
+		if (!s_closingForAppExit)
+			Config::Current()->NetworkMonitorUp(false);
+		s_closingForAppExit = false;
+	});
 
 	QVBoxLayout *layout = new QVBoxLayout(dialog);
 
@@ -145,6 +181,37 @@ bool open_network_monitor_dialog()
 	layout->addLayout(footer);
 	layout->setAlignment(footer, Qt::AlignRight);
 
+	// Restore the last saved size/position, if any. -1 (the default) means
+	// "never saved" - leave Qt's own computed size/placement alone in that case.
+	const int savedWidth = Config::Current()->NetworkMonitorWidth();
+	const int savedHeight = Config::Current()->NetworkMonitorHeight();
+	if (savedWidth > 0 && savedHeight > 0)
+		dialog->resize(savedWidth, savedHeight);
+
+	const int savedX = Config::Current()->NetworkMonitorLocX();
+	const int savedY = Config::Current()->NetworkMonitorLocY();
+	if (savedX != -1 && savedY != -1) {
+		const QPoint savedPos(savedX, savedY);
+		bool visibleOnAScreen = false;
+		for (QScreen *screen : QGuiApplication::screens()) {
+			if (screen->geometry().contains(savedPos)) {
+				visibleOnAScreen = true;
+				break;
+			}
+		}
+		if (visibleOnAScreen) {
+			dialog->move(savedPos);
+		} else if (QScreen *primary = QGuiApplication::primaryScreen()) {
+			// Saved location is off any current screen (e.g. a monitor was
+			// unplugged) - fall back to centering on the primary screen.
+			const QRect avail = primary->availableGeometry();
+			dialog->move(avail.center() - QPoint(dialog->width() / 2, dialog->height() / 2));
+		}
+	}
+
+	// Persist geometry changes (move/resize) as they happen.
+	dialog->installEventFilter(new NetworkMonitorGeometryWatcher(dialog));
+
 	// show() returns immediately properties dialog and OBS remain interactive
 	dialog->show();
 	dialog->raise();
@@ -155,6 +222,7 @@ bool open_network_monitor_dialog()
 void close_network_monitor_dialog()
 {
 	if (s_dialog) {
+		s_closingForAppExit = true;
 		s_dialog->close();
 	}
 }

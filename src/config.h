@@ -100,6 +100,18 @@ public:
 	int MinAutoUpdateCheckIntervalSeconds();
 	void MinAutoUpdateCheckIntervalSeconds(int seconds);
 
+	// Network Monitor dialog state, persisted so it can be restored across
+	// restarts: whether it was open, and its last known screen geometry.
+	// LocX/LocY/Width/Height default to -1, meaning "never saved" - callers
+	// should leave the dialog's Qt-computed placement/size alone in that case.
+	bool NetworkMonitorUp();
+	void NetworkMonitorUp(bool value);
+	int NetworkMonitorLocX();
+	int NetworkMonitorLocY();
+	int NetworkMonitorWidth();
+	int NetworkMonitorHeight();
+	void SetNetworkMonitorGeometry(int x, int y, int width, int height);
+
 	void Save();
 
 private:

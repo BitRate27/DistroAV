@@ -489,6 +489,8 @@ bool obs_module_load(void)
 						[] {
 							main_output_init();
 							preview_output_init();
+							if (Config::Current()->NetworkMonitorUp())
+								open_network_monitor_dialog();
 						},
 						Qt::QueuedConnection);
 				} else if (event == OBS_FRONTEND_EVENT_EXIT) {
