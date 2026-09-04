@@ -75,6 +75,11 @@
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QFrame>
+#include <QClipboard>
+#include <QGuiApplication>
+
+#include "obs.h"
+#include "plugin-support.h"
 
 namespace {
 
@@ -133,6 +138,44 @@ public:
 	{
 		buildUi();
 		loadFromDisk();
+	}
+
+	// Dump every section/value currently shown to the OBS log, one line per
+	// field, matching the style of dumpAdapterReportToLog / dumpSenderReportToLog /
+	// dumpReceiverReportToLog in network-monitor.cpp.
+	void dumpConfigToLog() const
+	{
+		const char reportHeader[] = "NDI Config Report";
+		obs_log(LOG_INFO, "%s ----------------------------------------", reportHeader);
+		obs_log(LOG_INFO, "%s Config file: %s", reportHeader, m_configPath.toUtf8().constData());
+		obs_log(LOG_INFO, "%s Machine name override: %s", reportHeader,
+			m_machineName->text().toUtf8().constData());
+		obs_log(LOG_INFO, "%s Send groups: %s", reportHeader, m_groupsSend->text().toUtf8().constData());
+		obs_log(LOG_INFO, "%s Receive groups: %s", reportHeader, m_groupsRecv->text().toUtf8().constData());
+		obs_log(LOG_INFO, "%s Extra IPs to discover: %s", reportHeader,
+			m_extraIps->text().toUtf8().constData());
+		obs_log(LOG_INFO, "%s Discovery server: %s", reportHeader,
+			m_discoveryServer->text().toUtf8().constData());
+		obs_log(LOG_INFO, "%s Allow TCP receive: %s", reportHeader,
+			m_tcpRecvEnable->isChecked() ? "Yes" : "No");
+		obs_log(LOG_INFO, "%s Allow unicast UDP receive: %s", reportHeader,
+			m_unicastRecvEnable->isChecked() ? "Yes" : "No");
+		obs_log(LOG_INFO, "%s Allow RUDP receive: %s", reportHeader,
+			m_rudpRecvEnable->isChecked() ? "Yes" : "No");
+		obs_log(LOG_INFO, "%s Enable multicast send: %s", reportHeader,
+			m_multicastEnable->isChecked() ? "Yes" : "No");
+		obs_log(LOG_INFO, "%s Multicast TTL: %d", reportHeader, m_multicastTtl->value());
+		obs_log(LOG_INFO, "%s Multicast Netmask: %s", reportHeader,
+			m_multicastNetmask->text().toUtf8().constData());
+		obs_log(LOG_INFO, "%s Multicast Net prefix: %s", reportHeader,
+			m_multicastNetprefix->text().toUtf8().constData());
+		if (m_allowedAdapters->count() == 0) {
+			obs_log(LOG_INFO, "%s Allowed Adapters: (none)", reportHeader);
+		} else {
+			for (int i = 0; i < m_allowedAdapters->count(); ++i)
+				obs_log(LOG_INFO, "%s Allowed Adapter: %s", reportHeader,
+					m_allowedAdapters->item(i)->text().toUtf8().constData());
+		}
 	}
 
 private:
@@ -275,15 +318,19 @@ private:
 
 		auto *footer = new QHBoxLayout();
 		auto *reloadBtn = new QPushButton("Reload from Disk", this);
+		auto *copyBtn = new QPushButton("Copy", this);
 
 		m_statusLabel = new QLabel(this);
 		m_statusLabel->setStyleSheet("color: #666;");
 		footer->addWidget(reloadBtn);
+		footer->addWidget(copyBtn);
 		footer->addStretch(1);
 		footer->addWidget(m_statusLabel);
 		root->addLayout(footer);
 
 		connect(reloadBtn, &QPushButton::clicked, this, &NdiNetworkConfigWidget::loadFromDisk);
+		connect(copyBtn, &QPushButton::clicked, this,
+			[this]() { QGuiApplication::clipboard()->setText(getFormattedConfigText()); });
 
 		setWindowTitle("NDI Network Configuration");
 		resize(760, 560);
@@ -325,7 +372,7 @@ private:
 		m_machineName->clear();
 		m_groupsSend->clear();
 		m_groupsRecv->clear();
-		m_extraIps->clear();
+		m_extraIps->setText("(none)");
 		m_discoveryServer->clear();
 		m_tcpRecvEnable->setChecked(false);
 		m_unicastRecvEnable->setChecked(false);
@@ -348,7 +395,8 @@ private:
 		m_groupsRecv->setText(groups.value("recv").toString());
 
 		const QJsonObject networks = childObj(ndi, "networks");
-		m_extraIps->setText(networks.value("ips").toString());
+		const QString extraIps = networks.value("ips").toString();
+		m_extraIps->setText(extraIps.isEmpty() ? "(none)" : extraIps);
 		m_discoveryServer->setText(networks.value("discovery").toString());
 
 		const QJsonObject tcp = childObj(ndi, "tcp");
@@ -377,6 +425,57 @@ private:
 	{
 		// Saving is disabled in viewer mode; do nothing.
 		QMessageBox::information(this, "Read-only Viewer", "Saving is disabled in the NDI config viewer.");
+	}
+
+	// Plain-ASCII dump of every section/value currently shown, for the Copy button.
+	// No borders/alignment - just "Section" headings and "Label: value" lines.
+	QString getFormattedConfigText() const
+	{
+		auto yesNo = [](bool b) {
+			return QString(b ? "Yes" : "No");
+		};
+
+		QStringList lines;
+		lines << "NDI Network Configuration";
+		lines << ("Config file: " + m_configPath);
+		lines << "";
+
+		lines << "Machine Identity";
+		lines << ("  Machine name override: " + m_machineName->text());
+		lines << "";
+
+		lines << "Groups";
+		lines << ("  Send groups: " + m_groupsSend->text());
+		lines << ("  Receive groups: " + m_groupsRecv->text());
+		lines << "";
+
+		lines << "Networks && Discovery";
+		lines << ("  Extra IPs to discover: " + m_extraIps->text());
+		lines << ("  Discovery server: " + m_discoveryServer->text());
+		lines << "";
+
+		lines << "Connection Modes";
+		lines << ("  Allow TCP receive: " + yesNo(m_tcpRecvEnable->isChecked()));
+		lines << ("  Allow unicast UDP receive: " + yesNo(m_unicastRecvEnable->isChecked()));
+		lines << ("  Allow RUDP receive: " + yesNo(m_rudpRecvEnable->isChecked()));
+		lines << "";
+
+		lines << "Multicast (send)";
+		lines << ("  Enable multicast send: " + yesNo(m_multicastEnable->isChecked()));
+		lines << ("  TTL: " + QString::number(m_multicastTtl->value()));
+		lines << ("  Netmask: " + m_multicastNetmask->text());
+		lines << ("  Net prefix: " + m_multicastNetprefix->text());
+		lines << "";
+
+		lines << "Allowed Network Adapters (IPs)";
+		if (m_allowedAdapters->count() == 0) {
+			lines << "  (none)";
+		} else {
+			for (int i = 0; i < m_allowedAdapters->count(); ++i)
+				lines << ("  " + m_allowedAdapters->item(i)->text());
+		}
+
+		return lines.join('\n');
 	}
 };
 

@@ -105,7 +105,10 @@ bool open_network_monitor_dialog()
 	QPushButton *dumpBtn = new QPushButton(dialog->tr("Dump to OBS Log"), dialog);
 	dumpBtn->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
 	footer->addWidget(dumpBtn);
-	QObject::connect(dumpBtn, &QPushButton::clicked, dialog, []() { network_monitor->dumpNetworkReportToLog(); });
+	QObject::connect(dumpBtn, &QPushButton::clicked, dialog, [configWidget]() {
+		network_monitor->dumpNetworkReportToLog();
+		configWidget->dumpConfigToLog();
+	});
 	QPushButton *okBtn = new QPushButton(dialog->tr("Close"), dialog);
 	okBtn->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
 	footer->addWidget(okBtn);

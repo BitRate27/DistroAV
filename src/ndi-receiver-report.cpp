@@ -170,7 +170,8 @@ void ReceiverInfo::receive_video_frame(uint64_t t0, uint64_t t1, uint64_t t2, ND
 	std::lock_guard<std::mutex> lock(m_mutex);
 	if (running.video_frame_count == 0) {
 		running.start_video_frame_os = t1;
-		running.start_video_frame_timestamp = ndi_frame.timestamp * 100ULL;
+		if (ndi_frame.timestamp != NDIlib_recv_timestamp_undefined)
+			running.start_video_frame_timestamp = (uint64_t)ndi_frame.timestamp * 100ULL;
 		running.tot_frame_interval = 0;
 		running.max_frame_interval = 0;
 		running.fourcc = ndi_frame.FourCC;
@@ -184,13 +185,25 @@ void ReceiverInfo::receive_video_frame(uint64_t t0, uint64_t t1, uint64_t t2, ND
 		running.max_video_processing = 0;
 	}
 
-	if (running.last_video_frame_timestamp != 0) {
-		uint64_t frame_interval = (ndi_frame.timestamp * 100ULL) - running.last_video_frame_timestamp;
-		running.tot_frame_interval += frame_interval;
-		running.max_frame_interval = std::max<uint64_t>(running.max_frame_interval, frame_interval);
+	// NDI reports NDIlib_recv_timestamp_undefined (INT64_MAX) when a sender doesn't
+	// provide a timestamp. Feeding that sentinel into the *100ULL multiply (overflow)
+	// or the subsequent unsigned subtraction against a stale last_video_frame_timestamp
+	// (underflow) produces a garbage frame_interval - sometimes billions of times
+	// larger than a real one - which then poisons max_frame_interval (and therefore
+	// jitter_ratio) for the rest of the reporting window. Skip timing updates for such
+	// frames entirely, same as the A/V drift tracking below already does.
+	if (ndi_frame.timestamp != NDIlib_recv_timestamp_undefined) {
+		const uint64_t timestamp_ns = (uint64_t)ndi_frame.timestamp * 100ULL;
+
+		if (running.last_video_frame_timestamp != 0) {
+			uint64_t frame_interval = timestamp_ns - running.last_video_frame_timestamp;
+			running.tot_frame_interval += frame_interval;
+			running.max_frame_interval = std::max<uint64_t>(running.max_frame_interval, frame_interval);
+		}
+
+		running.last_video_frame_timestamp = timestamp_ns;
 	}
 
-	running.last_video_frame_timestamp = ndi_frame.timestamp * 100ULL;
 	running.target_fps = (double)ndi_frame.frame_rate_N / (double)ndi_frame.frame_rate_D;
 
 	uint64_t capture_interval = t1 - t0;
@@ -229,11 +242,17 @@ void ReceiverInfo::receive_video_frame(uint64_t t0, uint64_t t1, uint64_t t2, ND
 
 void ReceiverInfo::receive_audio_frame(uint64_t t0, uint64_t t1, uint64_t, NDIlib_audio_frame_v3_t &ndi_frame)
 {
-	if (running.audio_sample_count == 0) {
-		running.start_audio_sample_os = t0;
-		running.start_audio_sample_timestamp = ndi_frame.timestamp * 100ULL;
+	// See the matching guard in receive_video_frame(): NDIlib_recv_timestamp_undefined
+	// (INT64_MAX) must not be multiplied/subtracted as if it were a real timestamp, or
+	// tsSPS ends up computed from a garbage elapsed-time value.
+	if (ndi_frame.timestamp != NDIlib_recv_timestamp_undefined) {
+		const uint64_t timestamp_ns = (uint64_t)ndi_frame.timestamp * 100ULL;
+		if (running.audio_sample_count == 0)
+			running.start_audio_sample_timestamp = timestamp_ns;
+		running.last_audio_sample_timestamp = timestamp_ns;
 	}
-	running.last_audio_sample_timestamp = ndi_frame.timestamp * 100ULL;
+	if (running.audio_sample_count == 0)
+		running.start_audio_sample_os = t0;
 	running.last_audio_sample_os = t0;
 	running.target_sps = (double)ndi_frame.sample_rate;
 	running.audio_sample_count += ndi_frame.no_samples;
