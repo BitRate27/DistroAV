@@ -27,10 +27,7 @@
 #include <QGroupBox>
 #include <QMenu>
 #include <QAction>
-#include <QPushButton>
 #include <QHBoxLayout>
-#include <QApplication>
-#include <QClipboard>
 #include <QBrush>
 #include <QColor>
 
@@ -478,6 +475,8 @@ NdiAdapterTableWidget::NdiAdapterTableWidget(QWidget *parent)
 
 	m_tableView->setEditTriggers(QAbstractItemView::NoEditTriggers); // read-only
 	m_tableView->setAlternatingRowColors(true);
+	m_tableView->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+	m_tableView->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 	m_tableView->verticalHeader()->setVisible(false);
 
 	// Sorting: click a header section to sort asc/desc by that column.
@@ -491,36 +490,14 @@ NdiAdapterTableWidget::NdiAdapterTableWidget(QWidget *parent)
 	connect(header, &QHeaderView::customContextMenuRequested, this, &NdiAdapterTableWidget::showHeaderContextMenu);
 
 	layout->setContentsMargins(0, 0, 0, 0);
-	// Let the table expand to take available space; footer will keep its size.
+	// Let the table expand to take available space.
 	m_tableView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 	layout->addWidget(m_tableView);
 	// Give the table stretch so it keeps space when the dialog lays out widgets.
 	layout->setStretch(0, 1);
 
-	// Footer with Copy and OK buttons. OK closes the top-level window (dialog).
-	QHBoxLayout *footer = new QHBoxLayout();
-	footer->setContentsMargins(0, 6, 0, 0);
-	footer->setSpacing(8);
-	footer->addStretch();
-	QPushButton *copyBtn = new QPushButton(tr("Copy"), this);
-
-	// Prevent buttons from expanding to fill available space
-	copyBtn->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
-	footer->addWidget(copyBtn);
-
-	// Align footer contents to the right (addStretch already does this, but
-	// ensure the layout doesn't expand the buttons)
-	footer->setAlignment(Qt::AlignRight);
-
-	layout->addLayout(footer);
-
-	// Copy button: build a tab-separated representation including headers and put it on the clipboard.
-	connect(copyBtn, &QPushButton::clicked, this, [this]() {
-		std::string text = "`\n" + network_monitor->getFormattedAdapterReport() + "\n`";
-
-		QClipboard *clipboard = QApplication::clipboard();
-		clipboard->setText(QString::fromUtf8(text));
-	});
+	// Copy moved to a single button in the dialog's own footer (copies whichever
+	// tab is currently active); see network-monitor-dialog.cpp.
 
 	setLayout(layout);
 	m_changeNotifier = new ChangeNotifier([this]() {
@@ -572,39 +549,11 @@ void NdiAdapterTableWidget::setAdapters(const std::vector<NdiAdapterInfo> &adapt
 	m_tableView->horizontalHeader()->setSectionResizeMode(NdiAdapterTableModel::ColTransmitSpeed,
 							      QHeaderView::Fixed);
 
-	// Compute required width: sum of all column widths + vertical header + frame
-	int totalWidth = 0;
-	QHeaderView *vheader = m_tableView->verticalHeader();
-	totalWidth += vheader->width();
-	for (int c = 0; c < m_model->columnCount(); ++c)
-		// Use header section size after resizeColumnsToContents() instead of
-		// protected sizeHintForColumn/sizeHintForRow.
-		totalWidth += m_tableView->horizontalHeader()->sectionSize(c);
-	// include frame border
-	totalWidth += m_tableView->frameWidth() * 2;
-
-	// Compute required height: header + sum of row heights + frame
-	int totalHeight = 0;
-	QHeaderView *hheader = m_tableView->horizontalHeader();
-	totalHeight += hheader->height();
-
-	int rows = m_model->rowCount();
-	if (rows > 0) {
-		for (int r = 0; r < rows; ++r)
-			totalHeight += m_tableView->verticalHeader()->sectionSize(r);
-	} else {
-		// ensure a small reasonable height if there are no rows: use the
-		// vertical header's default section size as a fallback for row height
-		// (represents a reasonable single-row height).
-		totalHeight += m_tableView->verticalHeader()->defaultSectionSize();
-	}
-	// include frame border
-	totalHeight += m_tableView->frameWidth() * 2;
-
-	// Apply the computed size as a minimum for the table only. Avoid forcing
-	// the whole widget/dialog size so footer buttons remain below the table
-	// and do not cause the table to be shrunk to make room.
-	m_tableView->setMinimumSize(totalWidth, totalHeight);
+	// Note: previously this forced the table's minimum size to fit every column/row
+	// so nothing ever needed scrolling. That's no longer wanted - the dialog itself
+	// must be shrinkable, so the table now relies on its default (small) minimum
+	// size hint and shows horizontal/vertical scrollbars (QTableView's default
+	// ScrollBarAsNeeded policy) whenever it's smaller than its contents.
 }
 
 void NdiAdapterTableWidget::showHeaderContextMenu(const QPoint &pos)

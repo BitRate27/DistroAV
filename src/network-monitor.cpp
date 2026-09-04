@@ -74,8 +74,8 @@ std::array<std::size_t, N> computeReceiverWidths(const std::array<ReceiverColumn
 	for (const auto &pair : receivers) {
 		const auto &snapshot = pair.second->getReportSnapshot();
 		const std::array<std::string, N> values = {{
-			snapshot.obs_source_name,
 			pair.second->get_ndi_name(),
+			snapshot.obs_source_name,
 			std::to_string(snapshot.video_frames_dropped),
 			std::to_string(snapshot.video_queue_size),
 			snapshot.format_description,

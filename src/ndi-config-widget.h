@@ -75,8 +75,7 @@
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QFrame>
-#include <QClipboard>
-#include <QGuiApplication>
+#include <QScrollArea>
 
 #include "obs.h"
 #include "plugin-support.h"
@@ -178,6 +177,58 @@ public:
 		}
 	}
 
+	// Plain-ASCII dump of every section/value currently shown, for the dialog's
+	// shared Copy button. No borders/alignment - just "Section" headings and
+	// "Label: value" lines.
+	QString getFormattedConfigText() const
+	{
+		auto yesNo = [](bool b) {
+			return QString(b ? "Yes" : "No");
+		};
+
+		QStringList lines;
+		lines << "NDI Network Configuration";
+		lines << ("Config file: " + m_configPath);
+		lines << "";
+
+		lines << "Machine Identity";
+		lines << ("  Machine name override: " + m_machineName->text());
+		lines << "";
+
+		lines << "Groups";
+		lines << ("  Send groups: " + m_groupsSend->text());
+		lines << ("  Receive groups: " + m_groupsRecv->text());
+		lines << "";
+
+		lines << "Networks && Discovery";
+		lines << ("  Extra IPs to discover: " + m_extraIps->text());
+		lines << ("  Discovery server: " + m_discoveryServer->text());
+		lines << "";
+
+		lines << "Connection Modes";
+		lines << ("  Allow TCP receive: " + yesNo(m_tcpRecvEnable->isChecked()));
+		lines << ("  Allow unicast UDP receive: " + yesNo(m_unicastRecvEnable->isChecked()));
+		lines << ("  Allow RUDP receive: " + yesNo(m_rudpRecvEnable->isChecked()));
+		lines << "";
+
+		lines << "Multicast (send)";
+		lines << ("  Enable multicast send: " + yesNo(m_multicastEnable->isChecked()));
+		lines << ("  TTL: " + QString::number(m_multicastTtl->value()));
+		lines << ("  Netmask: " + m_multicastNetmask->text());
+		lines << ("  Net prefix: " + m_multicastNetprefix->text());
+		lines << "";
+
+		lines << "Allowed Network Adapters (IPs)";
+		if (m_allowedAdapters->count() == 0) {
+			lines << "  (none)";
+		} else {
+			for (int i = 0; i < m_allowedAdapters->count(); ++i)
+				lines << ("  " + m_allowedAdapters->item(i)->text());
+		}
+
+		return lines.join('\n');
+	}
+
 private:
 	// Widgets - one per field, each typed for what it actually represents.
 	QLabel *m_pathLabel = nullptr;
@@ -216,7 +267,19 @@ private:
 
 	void buildUi()
 	{
-		auto *root = new QVBoxLayout(this);
+		// Everything lives in an inner content widget placed inside a QScrollArea,
+		// so the tab (and therefore the dialog) can be shrunk arbitrarily small -
+		// the content just scrolls instead of forcing a large minimum size.
+		auto *outerLayout = new QVBoxLayout(this);
+		outerLayout->setContentsMargins(0, 0, 0, 0);
+
+		auto *scrollArea = new QScrollArea(this);
+		scrollArea->setWidgetResizable(true);
+		scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+		scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+
+		auto *contentWidget = new QWidget(scrollArea);
+		auto *root = new QVBoxLayout(contentWidget);
 
 		// -- header: which file we're looking at --
 		m_pathLabel = new QLabel(this);
@@ -318,19 +381,18 @@ private:
 
 		auto *footer = new QHBoxLayout();
 		auto *reloadBtn = new QPushButton("Reload from Disk", this);
-		auto *copyBtn = new QPushButton("Copy", this);
 
 		m_statusLabel = new QLabel(this);
 		m_statusLabel->setStyleSheet("color: #666;");
 		footer->addWidget(reloadBtn);
-		footer->addWidget(copyBtn);
 		footer->addStretch(1);
 		footer->addWidget(m_statusLabel);
 		root->addLayout(footer);
 
 		connect(reloadBtn, &QPushButton::clicked, this, &NdiNetworkConfigWidget::loadFromDisk);
-		connect(copyBtn, &QPushButton::clicked, this,
-			[this]() { QGuiApplication::clipboard()->setText(getFormattedConfigText()); });
+
+		scrollArea->setWidget(contentWidget);
+		outerLayout->addWidget(scrollArea);
 
 		setWindowTitle("NDI Network Configuration");
 		resize(760, 560);
@@ -425,57 +487,6 @@ private:
 	{
 		// Saving is disabled in viewer mode; do nothing.
 		QMessageBox::information(this, "Read-only Viewer", "Saving is disabled in the NDI config viewer.");
-	}
-
-	// Plain-ASCII dump of every section/value currently shown, for the Copy button.
-	// No borders/alignment - just "Section" headings and "Label: value" lines.
-	QString getFormattedConfigText() const
-	{
-		auto yesNo = [](bool b) {
-			return QString(b ? "Yes" : "No");
-		};
-
-		QStringList lines;
-		lines << "NDI Network Configuration";
-		lines << ("Config file: " + m_configPath);
-		lines << "";
-
-		lines << "Machine Identity";
-		lines << ("  Machine name override: " + m_machineName->text());
-		lines << "";
-
-		lines << "Groups";
-		lines << ("  Send groups: " + m_groupsSend->text());
-		lines << ("  Receive groups: " + m_groupsRecv->text());
-		lines << "";
-
-		lines << "Networks && Discovery";
-		lines << ("  Extra IPs to discover: " + m_extraIps->text());
-		lines << ("  Discovery server: " + m_discoveryServer->text());
-		lines << "";
-
-		lines << "Connection Modes";
-		lines << ("  Allow TCP receive: " + yesNo(m_tcpRecvEnable->isChecked()));
-		lines << ("  Allow unicast UDP receive: " + yesNo(m_unicastRecvEnable->isChecked()));
-		lines << ("  Allow RUDP receive: " + yesNo(m_rudpRecvEnable->isChecked()));
-		lines << "";
-
-		lines << "Multicast (send)";
-		lines << ("  Enable multicast send: " + yesNo(m_multicastEnable->isChecked()));
-		lines << ("  TTL: " + QString::number(m_multicastTtl->value()));
-		lines << ("  Netmask: " + m_multicastNetmask->text());
-		lines << ("  Net prefix: " + m_multicastNetprefix->text());
-		lines << "";
-
-		lines << "Allowed Network Adapters (IPs)";
-		if (m_allowedAdapters->count() == 0) {
-			lines << "  (none)";
-		} else {
-			for (int i = 0; i < m_allowedAdapters->count(); ++i)
-				lines << ("  " + m_allowedAdapters->item(i)->text());
-		}
-
-		return lines.join('\n');
 	}
 };
 

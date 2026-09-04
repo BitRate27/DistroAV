@@ -36,6 +36,8 @@
 #include <QWidget>
 #include <QTabWidget>
 #include <QPointer>
+#include <QClipboard>
+#include <QGuiApplication>
 
 // This is used as a global by ndi-source.cpp / plugin-main.h; declared extern there.
 extern NetworkMonitor *network_monitor;
@@ -58,6 +60,8 @@ bool open_network_monitor_dialog()
 	dialog->setAttribute(Qt::WA_DeleteOnClose);
 	dialog->setWindowTitle("Network Monitor");
 	dialog->setWindowModality(Qt::NonModal);
+	dialog->setMinimumSize(400, 100);
+	dialog->setSizeGripEnabled(true);
 	QObject::connect(dialog, &QObject::destroyed, []() { s_dialog = nullptr; });
 
 	QVBoxLayout *layout = new QVBoxLayout(dialog);
@@ -109,6 +113,25 @@ bool open_network_monitor_dialog()
 		network_monitor->dumpNetworkReportToLog();
 		configWidget->dumpConfigToLog();
 	});
+	QPushButton *copyBtn = new QPushButton(dialog->tr("Copy"), dialog);
+	copyBtn->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+	footer->addWidget(copyBtn);
+	QObject::connect(copyBtn, &QPushButton::clicked, dialog,
+			 [tabWidget, adapterTable, senderTable, receiverTable, configWidget]() {
+				 QWidget *current = tabWidget->currentWidget();
+				 QString text;
+				 if (current == adapterTable) {
+					 text = QString::fromUtf8(network_monitor->getFormattedAdapterReport());
+				 } else if (current == senderTable) {
+					 text = QString::fromUtf8(network_monitor->getFormattedSenderReport());
+				 } else if (current == receiverTable) {
+					 text = QString::fromUtf8(network_monitor->getFormattedReceiverReport());
+				 } else if (current == configWidget) {
+					 text = configWidget->getFormattedConfigText();
+				 }
+				 QGuiApplication::clipboard()->setText(text);
+			 });
+
 	QPushButton *okBtn = new QPushButton(dialog->tr("Close"), dialog);
 	okBtn->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
 	footer->addWidget(okBtn);

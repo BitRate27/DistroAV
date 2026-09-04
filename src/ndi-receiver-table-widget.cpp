@@ -23,10 +23,6 @@
 #include <QVBoxLayout>
 #include <QMenu>
 #include <QAction>
-#include <QPushButton>
-#include <QHBoxLayout>
-#include <QApplication>
-#include <QClipboard>
 #include <QFontMetrics>
 #include <QPointer>
 
@@ -247,6 +243,8 @@ NdiReceiverTableWidget::NdiReceiverTableWidget(QWidget *parent)
 	m_tableView->setFocusPolicy(Qt::NoFocus);
 	m_tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
 	m_tableView->setAlternatingRowColors(true);
+	m_tableView->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+	m_tableView->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 	m_tableView->verticalHeader()->setVisible(false);
 	m_tableView->setSortingEnabled(true);
 	m_tableView->sortByColumn(NdiReceiverTableModel::ColObsSourceName, Qt::AscendingOrder);
@@ -263,23 +261,8 @@ NdiReceiverTableWidget::NdiReceiverTableWidget(QWidget *parent)
 	layout->addWidget(m_tableView);
 	layout->setStretch(0, 1);
 
-	QHBoxLayout *footer = new QHBoxLayout();
-	footer->setContentsMargins(0, 6, 0, 0);
-	footer->setSpacing(8);
-	footer->addStretch();
-	QPushButton *copyBtn = new QPushButton(tr("Copy"), this);
-	copyBtn->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
-	footer->addWidget(copyBtn);
-	footer->setAlignment(Qt::AlignRight);
-	layout->addLayout(footer);
-
-	// Copy button: build a tab-separated representation including headers and put it on the clipboard.
-	connect(copyBtn, &QPushButton::clicked, this, []() {
-		std::string text = network_monitor->getFormattedReceiverReport();
-
-		QClipboard *clipboard = QApplication::clipboard();
-		clipboard->setText(QString::fromUtf8(text));
-	});
+	// Copy moved to a single button in the dialog's own footer (copies whichever
+	// tab is currently active); see network-monitor-dialog.cpp.
 
 	setLayout(layout);
 	QPointer<NdiReceiverTableWidget> guard(this);
