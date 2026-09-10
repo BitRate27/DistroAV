@@ -583,7 +583,7 @@ ReceiverInfo *NetworkMonitor::registerReceiver(obs_source_t *ndi_source)
 	return receiver_info;
 }
 
-void NetworkMonitor::setReceiver(obs_source_t *ndi_source, NDIlib_recv_instance_t ndi_receiver)
+void NetworkMonitor::setReceiver(obs_source_t *ndi_source, NdiReceiverBackend *ndi_backend)
 {
 	if (ndi_source == nullptr) {
 		return;
@@ -592,7 +592,7 @@ void NetworkMonitor::setReceiver(obs_source_t *ndi_source, NDIlib_recv_instance_
 		std::lock_guard<std::mutex> lock(m_mutex);
 		auto it = m_receivers.find(ndi_source);
 		if (it != m_receivers.end()) {
-			it->second->set_receiver(ndi_receiver);
+			it->second->set_receiver(ndi_backend);
 		}
 	}
 }

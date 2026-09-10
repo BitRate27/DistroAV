@@ -33,6 +33,8 @@
 #include "ndi-sender-report.h"
 #include "ndi-receiver-report.h"
 
+class NdiReceiverBackend;
+
 // Maintains a thread-safe list of "sender" pointers (opaque void*) and runs
 // a background thread that continuously monitors how many senders are
 // currently registered. Callers register/unregister senders from any
@@ -77,7 +79,7 @@ public:
 
 	// Adds the source as a potential receiver of ndi
 	ReceiverInfo *registerReceiver(obs_source_t *ndi_source);
-	void setReceiver(obs_source_t *ndi_source, NDIlib_recv_instance_t ndi_receiver);
+	void setReceiver(obs_source_t *ndi_source, NdiReceiverBackend *ndi_backend);
 
 	// Removes `receiver` from the list of registered receiver.
 	void unregisterReceiver(obs_source_t *ndi_source);

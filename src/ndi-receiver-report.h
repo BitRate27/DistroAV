@@ -27,6 +27,8 @@
 #include <limits>
 #include <Processing.NDI.Lib.h>
 
+class NdiReceiverBackend;
+
 struct NDIReceiverStats {
 	size_t video_frames_dropped = 0;
 	size_t audio_samples_dropped = 0;
@@ -97,8 +99,10 @@ public:
 	void set_ndi_name(const std::string &ndi_name);
 	std::string get_ndi_name() const;
 
-	// Set receiver instance
-	void set_receiver(NDIlib_recv_instance_t receiver);
+	// Set the backend currently in use for this receiver (nullptr when torn
+	// down), so calculate_stats() can query NDI performance/queue counters
+	// through it. See ndi-receiver-backend.h.
+	void set_receiver(NdiReceiverBackend *backend);
 
 	// Snapshot accessor
 	NDIReceiverStats getReportSnapshot() const;
@@ -118,7 +122,7 @@ public:
 private:
 	mutable std::mutex m_mutex;
 	obs_source_t *m_source = nullptr;
-	NDIlib_recv_instance_t m_receiver;
+	NdiReceiverBackend *m_backend = nullptr;
 
 	// Map of tag -> ChangeNotifier*
 	std::map<std::string, ChangeNotifier *> changeNotifiers;

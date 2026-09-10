@@ -19,8 +19,10 @@
 #include "sync-debug.h"
 #include <util/platform.h>
 #include "ndi-receiver-report.h"
+#include "ndi-receiver-backend.h"
 #include "pthread.h"
 #include <thread>
+#include <memory>
 
 #define PROP_SOURCE "ndi_source_name"
 #define PROP_STATUS "ndi_status_status"
@@ -417,16 +419,19 @@ void *ndi_source_thread(void *data)
 	NDIlib_recv_create_v3_t recv_desc;
 	recv_desc.allow_video_fields = true;
 
-	NDIlib_recv_instance_t ndi_receiver = nullptr;
 	NDIlib_video_frame_v2_t video_frame;
-
-	NDIlib_metadata_frame_t metadata_frame;
-	NDIlib_framesync_instance_t ndi_frame_sync = nullptr;
 	NDIlib_audio_frame_v3_t audio_frame;
-	NDIlib_frame_type_e frame_received = NDIlib_frame_type_none;
+	bool use_framesync = false;
 
 	int64_t timestamp_audio = 0;
 	int64_t timestamp_video = 0;
+
+	// Hides *how* frames get from the NDI source into this process (direct
+	// NDIlib calls vs. the ndi-server.exe helper process) behind one
+	// interface; see ndi-receiver-backend.h. Which backend is active is
+	// decided once here, by Config::UseNdiServer, and nothing below this
+	// point needs to know or care which one it got.
+	std::unique_ptr<NdiReceiverBackend> ndi_backend = create_ndi_receiver_backend();
 
 	//
 	// Main NDI receiver loop: BEGIN
@@ -519,43 +524,27 @@ void *ndi_source_thread(void *data)
 
 			//
 			// recv_desc is fully populated;
-			// now reset the NDI receiver, destroying any existing ndi_frame_sync or ndi_receiver.
+			// now reset the NDI receiver, destroying any existing receiver/frame-sync state.
 			//
 			obs_log(LOG_DEBUG, "'%s' ndi_source_thread: reset_ndi_receiver: Resetting NDI receiver…",
 				obs_source_name);
 
-			if (ndi_frame_sync) {
-				obs_log(LOG_DEBUG, "'%s' ndi_source_thread: ndiLib->framesync_destroy(ndi_frame_sync)",
-					obs_source_name);
-				ndiLib->framesync_destroy(ndi_frame_sync);
-				ndi_frame_sync = nullptr;
-			}
-
-			if (ndi_receiver) {
-				obs_log(LOG_DEBUG,
-					"'%s' ndi_source_thread: reset_ndi_receiver: ndiLib->recv_destroy(ndi_receiver)",
-					obs_source_name);
-				network_monitor->setReceiver(s->obs_source, (NDIlib_recv_instance_t) nullptr);
-				ndiLib->recv_destroy(ndi_receiver);
-				ndi_receiver = nullptr;
-			}
+			network_monitor->setReceiver(s->obs_source, nullptr);
+			timestamp_audio = 0;
+			timestamp_video = 0;
 
 			obs_log(LOG_DEBUG,
 				"'%s' ndi_source_thread: reset_ndi_receiver: recv_desc = { p_ndi_recv_name='%s', source_to_connect_to.p_ndi_name='%s' }",
 				obs_source_name, //
 				recv_desc.p_ndi_recv_name, recv_desc.source_to_connect_to.p_ndi_name);
-			obs_log(LOG_DEBUG,
-				"'%s' ndi_source_thread: reset_ndi_receiver: +ndi_receiver = ndiLib->recv_create_v3(&recv_desc)",
+			obs_log(LOG_DEBUG, "'%s' ndi_source_thread: reset_ndi_receiver: +ndi_backend->createReceiver(…)",
 				obs_source_name);
 
-			ndi_receiver = ndiLib->recv_create_v3(&recv_desc);
+			bool receiver_created = ndi_backend->createReceiver(recv_desc, s->config.framesync_enabled);
 
-			network_monitor->setReceiver(s->obs_source, ndi_receiver);
-
-			obs_log(LOG_DEBUG,
-				"'%s' ndi_source_thread: reset_ndi_receiver: -ndi_receiver = ndiLib->recv_create_v3(&recv_desc)",
+			obs_log(LOG_DEBUG, "'%s' ndi_source_thread: reset_ndi_receiver: -ndi_backend->createReceiver(…)",
 				obs_source_name);
-			if (!ndi_receiver) {
+			if (!receiver_created) {
 				obs_log(LOG_ERROR, "ERR-407 - Error creating the NDI Receiver '%s' set for '%s'",
 					recv_desc.source_to_connect_to.p_ndi_name, obs_source_name);
 				obs_log(LOG_DEBUG,
@@ -563,6 +552,9 @@ void *ndi_source_thread(void *data)
 					obs_source_name, recv_desc.source_to_connect_to.p_ndi_name);
 				break;
 			}
+
+			use_framesync = s->config.framesync_enabled;
+			network_monitor->setReceiver(s->obs_source, ndi_backend.get());
 
 			if (s->config.hw_accel_enabled) {
 				//
@@ -595,34 +587,10 @@ void *ndi_source_thread(void *data)
 				// Destroy that receiver instance and you also destroy the metadata and thus the hardware acceleration.
 				// There is no confirmation that this works as theorized.
 				//
-				NDIlib_metadata_frame_t hwAccelMetadata;
-				hwAccelMetadata.p_data = (char *)"<ndi_video_codec type=\"hardware\"/>";
 				obs_log(LOG_DEBUG,
-					"'%s' ndi_source_thread: reset_ndi_receiver; Sending NDI Hardware Acceleration metadata: '%s'",
-					obs_source_name, hwAccelMetadata.p_data);
-				ndiLib->recv_send_metadata(ndi_receiver, &hwAccelMetadata);
-			}
-
-			if (s->config.framesync_enabled) {
-				timestamp_audio = 0;
-				timestamp_video = 0;
-				obs_log(LOG_DEBUG,
-					"'%s' ndi_source_thread: +ndi_frame_sync = ndiLib->framesync_create(ndi_receiver)",
+					"'%s' ndi_source_thread: reset_ndi_receiver; Requesting NDI Hardware Acceleration",
 					obs_source_name);
-				ndi_frame_sync = ndiLib->framesync_create(ndi_receiver);
-				obs_log(LOG_DEBUG,
-					"'%s' ndi_source_thread: -ndi_frame_sync = ndiLib->framesync_create(ndi_receiver); ndi_frame_sync=%p",
-					obs_source_name, //
-					ndi_frame_sync);
-				if (!ndi_frame_sync) {
-					obs_log(LOG_ERROR,
-						"ERR-408 - Error creating the NDI Frame Sync for '%s' for '%s'",
-						recv_desc.source_to_connect_to.p_ndi_name, obs_source_name);
-					obs_log(LOG_DEBUG,
-						"'%s' ndi_source_thread: Cannot create ndi_frame_sync for NDI source '%s'",
-						obs_source_name, recv_desc.source_to_connect_to.p_ndi_name);
-					break;
-				}
+				ndi_backend->setHardwareAcceleration(true);
 			}
 		}
 		//
@@ -634,7 +602,7 @@ void *ndi_source_thread(void *data)
 		// check if there are any connections.
 		// If not then micro-pause and restart the loop.
 		//
-		if (ndiLib->recv_get_no_connections(ndi_receiver) == 0) {
+		if (!ndi_backend->hasConnections()) {
 #if 0
 			obs_log(LOG_DEBUG,
 				"'%s' ndi_source_thread: No connection; sleep and restart loop",
@@ -656,13 +624,13 @@ void *ndi_source_thread(void *data)
 			    fabs(s->config.ptz.tilt - ptz.tilt) > tollerance ||
 			    fabs(s->config.ptz.zoom - ptz.zoom) > tollerance) {
 				ptz = s->config.ptz;
-				if (ndiLib->recv_ptz_is_supported(ndi_receiver)) {
+				if (ndi_backend->ptzIsSupported()) {
 					obs_log(LOG_DEBUG,
 						"'%s' ndi_source_thread: ptz changed; Sending PTZ pan=%f, tilt=%f, zoom=%f",
 						obs_source_name, //
 						ptz.pan, ptz.tilt, ptz.zoom);
-					ndiLib->recv_ptz_pan_tilt(ndi_receiver, ptz.pan, ptz.tilt);
-					ndiLib->recv_ptz_zoom(ndi_receiver, ptz.zoom);
+					ndi_backend->ptzPanTilt(ptz.pan, ptz.tilt);
+					ndi_backend->ptzZoom(ptz.zoom);
 				}
 			}
 		}
@@ -685,7 +653,7 @@ void *ndi_source_thread(void *data)
 			obs_log(LOG_DEBUG,
 				"'%s' ndi_source_thread: tally changed; Sending tally on_preview=%d, on_program=%d",
 				obs_source_name, tally.on_preview, tally.on_program);
-			ndiLib->recv_set_tally(ndi_receiver, &tally);
+			ndi_backend->setTally(tally);
 		}
 
 		//
@@ -699,25 +667,31 @@ void *ndi_source_thread(void *data)
 			continue;
 		}
 
-		if (ndi_frame_sync) {
+		if (use_framesync) {
 			//
-			// ndi_frame_sync
+			// frame_sync
 			//
-
-			//
-			// AUDIO
-			//
-			audio_frame = {};
 			uint64_t t0 = os_gettime_ns();
-			ndiLib->framesync_capture_audio_v2(
-				ndi_frame_sync, &audio_frame,
-				0,     // "The desired sample rate. 0 to get the source value."
-				0,     // "The desired channel count. 0 to get the source value."
-				1024); // "The desired sample count. 0 to get the source value."
+			bool ok = ndi_backend->captureFrameSync(video_frame, audio_frame);
 			uint64_t t1 = os_gettime_ns();
 
+			if (!ok) {
+				obs_log(LOG_ERROR, "Timed out waiting for a frame-sync frame");
+				ndi_backend = create_ndi_receiver_backend();
+				network_monitor->setReceiver(s->obs_source, nullptr);
+				s->config.reset_ndi_receiver = true;
+				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				continue;
+			}
+
 			// Note: "This function will always return data immediately, inserting silence if no current audio data is present."
-			if (audio_frame.p_data && (audio_frame.timestamp > timestamp_audio)) {
+			// A frame-sync capture before any real audio/video has ever arrived can come back
+			// with timestamp == NDIlib_recv_timestamp_undefined (INT64_MAX) rather than 0 - if
+			// that got latched into timestamp_audio/timestamp_video below, no later (real, much
+			// smaller) timestamp could ever satisfy `> timestamp_audio` again, permanently
+			// starving process_audio3/process_video2 of frames from that point on.
+			if (audio_frame.p_data && audio_frame.timestamp != NDIlib_recv_timestamp_undefined &&
+			    (audio_frame.timestamp > timestamp_audio)) {
 				timestamp_audio = audio_frame.timestamp;
 				// obs_log(LOG_DEBUG, "%s: New Audio Frame (Framesync ON): ts=%d tc=%d", obs_source_name, audio_frame.timestamp, audio_frame.timecode);
 				ndi_source_thread_process_audio3(&s->config, &audio_frame, s->obs_source,
@@ -726,17 +700,10 @@ void *ndi_source_thread(void *data)
 				if (s->ndi_receiver_info)
 					s->ndi_receiver_info->receive_audio_frame(t0, t1, t2, audio_frame);
 			}
-			ndiLib->framesync_free_audio_v2(ndi_frame_sync, &audio_frame);
+			ndi_backend->releaseFrameSyncAudio(audio_frame);
 
-			//
-			// VIDEO
-			//
-			video_frame = {};
-			t0 = os_gettime_ns();
-			ndiLib->framesync_capture_video(ndi_frame_sync, &video_frame,
-							NDIlib_frame_format_type_progressive);
-			t1 = os_gettime_ns();
-			if (video_frame.p_data && (video_frame.timestamp > timestamp_video)) {
+			if (video_frame.p_data && video_frame.timestamp != NDIlib_recv_timestamp_undefined &&
+			    (video_frame.timestamp > timestamp_video)) {
 				timestamp_video = video_frame.timestamp;
 				// obs_log(LOG_DEBUG, "%s: New Video Frame (Framesync ON): ts=%d tc=%d", obs_source_name, video_frame.timestamp, video_frame.timecode);
 				ndi_source_thread_process_video2(s, &video_frame, s->obs_source, &obs_video_frame);
@@ -744,47 +711,53 @@ void *ndi_source_thread(void *data)
 				if (s->ndi_receiver_info)
 					s->ndi_receiver_info->receive_video_frame(t0, t1, t2, video_frame);
 			}
-			ndiLib->framesync_free_video(ndi_frame_sync, &video_frame);
+			ndi_backend->releaseFrameSyncVideo(video_frame);
 
 			// TODO: More accurate sleep that subtracts the duration of this loop iteration?
 			std::this_thread::sleep_for(std::chrono::milliseconds(5));
 		} else {
 			//
-			// !ndi_frame_sync
+			// !frame_sync
 			//
 			uint64_t t0 = os_gettime_ns();
-			frame_received =
-				ndiLib->recv_capture_v3(ndi_receiver, &video_frame, &audio_frame, nullptr, 100);
+			NdiCaptureResult result = ndi_backend->captureFrame(video_frame, audio_frame, 100);
 			uint64_t t1 = os_gettime_ns();
-			if (frame_received == NDIlib_frame_type_audio) {
-				//
-				// AUDIO
-				//
+
+			switch (result) {
+			case NdiCaptureResult::Audio:
 				// obs_log(LOG_DEBUG, "%s: New Audio Frame (Framesync OFF): ts=%d tc=%d", obs_source_name, audio_frame.timestamp, audio_frame.timecode);
 				ndi_source_thread_process_audio3(&s->config, &audio_frame, s->obs_source,
 								 &obs_audio_frame);
-				uint64_t t2 = os_gettime_ns();
-				if (s->ndi_receiver_info)
-					s->ndi_receiver_info->receive_audio_frame(t0, t1, t2, audio_frame);
-				ndiLib->recv_free_audio_v3(ndi_receiver, &audio_frame);
+				{
+					uint64_t t2 = os_gettime_ns();
+					if (s->ndi_receiver_info)
+						s->ndi_receiver_info->receive_audio_frame(t0, t1, t2, audio_frame);
+				}
+				ndi_backend->releaseAudioFrame(audio_frame);
 				continue;
-			}
 
-			if (frame_received == NDIlib_frame_type_video) {
-				//
-				// VIDEO
-				//
+			case NdiCaptureResult::Video:
 				// obs_log(LOG_DEBUG, "%s: New Video Frame (Framesync OFF): ts=%d tc=%d", obs_source_name, video_frame.timestamp, video_frame.timecode);
 				ndi_source_thread_process_video2(s, &video_frame, s->obs_source, &obs_video_frame);
-				uint64_t t2 = os_gettime_ns();
-				ndiLib->recv_free_video_v2(ndi_receiver, &video_frame);
-				if (s->ndi_receiver_info)
-					s->ndi_receiver_info->receive_video_frame(t0, t1, t2, video_frame);
+				{
+					uint64_t t2 = os_gettime_ns();
+					ndi_backend->releaseVideoFrame(video_frame);
+					if (s->ndi_receiver_info)
+						s->ndi_receiver_info->receive_video_frame(t0, t1, t2, video_frame);
+				}
 				continue;
-			}
 
-			if (frame_received == NDIlib_frame_type_none) {
+			case NdiCaptureResult::None:
 				process_empty_frame(s);
+				break;
+
+			case NdiCaptureResult::Error:
+				obs_log(LOG_ERROR, "NDI receiver capture failed; recreating receiver");
+				ndi_backend = create_ndi_receiver_backend();
+				network_monitor->setReceiver(s->obs_source, nullptr);
+				s->config.reset_ndi_receiver = true;
+				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				continue;
 			}
 		}
 	}
@@ -792,27 +765,9 @@ void *ndi_source_thread(void *data)
 	// Main NDI receiver loop: END
 	//
 
-	if (ndi_frame_sync) {
-		if (ndiLib) {
-			obs_log(LOG_DEBUG,
-				"'%s' ndi_source_thread: (out of loop) ndiLib->framesync_destroy(ndi_frame_sync)",
-				obs_source_name);
-			ndiLib->framesync_destroy(ndi_frame_sync);
-		}
-		ndi_frame_sync = nullptr; // TODO: Investigate if this should be put right after framesync_destroy() ?
-		obs_log(LOG_DEBUG, "'%s' ndi_source_thread: Reset NDI Frame Sync", obs_source_name);
-	}
-
-	if (ndi_receiver) {
-		if (ndiLib) {
-			obs_log(LOG_DEBUG, "'%s' ndi_source_thread: ndiLib->recv_destroy(ndi_receiver)",
-				obs_source_name);
-			network_monitor->setReceiver(s->obs_source, (NDIlib_recv_instance_t) nullptr);
-			ndiLib->recv_destroy(ndi_receiver);
-		}
-		obs_log(LOG_DEBUG, "'%s' ndi_source_thread: Reset NDI Receiver", obs_source_name);
-		ndi_receiver = nullptr;
-	}
+	network_monitor->setReceiver(s->obs_source, nullptr);
+	ndi_backend->stop();
+	obs_log(LOG_DEBUG, "'%s' ndi_source_thread: Reset NDI Receiver", obs_source_name);
 
 	obs_log(LOG_DEBUG, "'%s' -ndi_source_thread(…)", obs_source_name);
 
@@ -1205,7 +1160,7 @@ void ndi_source_hidden(void *data)
 	if (s->running && s->config.behavior != PROP_BEHAVIOR_KEEP_ACTIVE) {
 		obs_log(LOG_DEBUG, "'%s' ndi_source_hidden: Requesting Source Thread Stop.", obs_source_name);
 		// Stopping the thread may result in `on_preview=false` not getting sent,
-		// but the thread's `ndiLib->recv_destroy` results in an implicit tally off.
+		// but the thread tearing down the NDI receiver on exit results in an implicit tally off.
 		ndi_source_thread_stop(s);
 	}
 }

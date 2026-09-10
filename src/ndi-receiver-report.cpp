@@ -17,6 +17,7 @@
 
 #include "ndi-receiver-report.h"
 #include "plugin-main.h" // provides extern ndiLib and network_monitor
+#include "ndi-receiver-backend.h"
 
 #include <algorithm>
 #include <vector>
@@ -44,7 +45,7 @@ static int64_t projected_relation(uint64_t a_ts_ns, uint64_t a_wall_ns, uint64_t
 // Constructor
 ReceiverInfo::ReceiverInfo(obs_source_t *ndi_source)
 	: m_source(ndi_source),
-	  m_receiver(nullptr),
+	  m_backend(nullptr),
 	  ndi_name(""),
 	  snapshot(),
 	  running()
@@ -107,17 +108,17 @@ NDIReceiverStats ReceiverInfo::getReportSnapshot() const
 	return snapshot;
 }
 
-void ReceiverInfo::set_receiver(NDIlib_recv_instance_t receiver)
+void ReceiverInfo::set_receiver(NdiReceiverBackend *backend)
 {
 	std::lock_guard<std::mutex> lock(m_mutex);
-	m_receiver = receiver;
+	m_backend = backend;
 }
 
 // Short textual status for logging/debug UI.
 std::string ReceiverInfo::get_brief_receiver_status() const
 {
 	std::lock_guard<std::mutex> lock(m_mutex);
-	if (m_receiver == nullptr) {
+	if (m_backend == nullptr) {
 		return "Receiver: Not active";
 	}
 
@@ -360,17 +361,15 @@ void ReceiverInfo::calculate_stats()
 	// Query NDI SDK for performance & queue info (if available)
 	{
 		std::lock_guard<std::mutex> lock(m_mutex);
-		if (ndiLib && m_receiver != nullptr) {
-
+		if (m_backend != nullptr) {
 			NDIlib_recv_performance_t total, dropped;
-			ndiLib->recv_get_performance(m_receiver, &total, &dropped);
-			snapshot.video_frames_dropped = dropped.video_frames;
-			snapshot.audio_samples_dropped = dropped.audio_frames;
-
 			NDIlib_recv_queue_t queue;
-			ndiLib->recv_get_queue(m_receiver, &queue);
-			snapshot.video_queue_size = queue.video_frames;
-			snapshot.audio_queue_size = queue.audio_frames;
+			if (m_backend->getPerformanceAndQueue(total, dropped, queue)) {
+				snapshot.video_frames_dropped = dropped.video_frames;
+				snapshot.audio_samples_dropped = dropped.audio_frames;
+				snapshot.video_queue_size = queue.video_frames;
+				snapshot.audio_queue_size = queue.audio_frames;
+			}
 		}
 
 		snapshot.format_description = network_monitor->getFormatDescription(

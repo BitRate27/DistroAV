@@ -62,6 +62,7 @@ bool Config::CheckObsForceFail = false;
 bool Config::CheckNdiLibBypass = false;
 bool Config::CheckObsBypass = false;
 int Config::DetectObsNdiForce = 0;
+bool Config::UseNdiServer = false;
 
 enum ObsConfigType { OBS_CONFIG_STRING, OBS_CONFIG_BOOL };
 
@@ -193,6 +194,22 @@ void ProcessCommandLine()
 					Config::DetectObsNdiForce = 1;
 				}
 			}
+		}
+
+		//
+		// NDI server helper process (ndi-server.exe) vs. direct NDIlib calls
+		//
+		if (argument.startsWith("--distroav-use-ndi-server")) {
+			auto parts = argument.split("=");
+			if (parts.size() > 1) {
+				auto value = parts.at(1).toLower();
+				Config::UseNdiServer = (value == "true" || value == "1" || value == "on");
+			} else {
+				Config::UseNdiServer = true;
+			}
+			obs_log(LOG_INFO, "config: DistroAV UseNdiServer set to %s",
+				Config::UseNdiServer ? "true" : "false");
+			continue;
 		}
 	}
 }

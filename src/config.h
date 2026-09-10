@@ -80,6 +80,15 @@ public:
 	 *  1 = `--DistroAV-detect-obsndi-force=on` : force OBS-NDI detected
 	 */
 	static int DetectObsNdiForce;
+	/**
+	 * Selects which NdiReceiverBackend ndi-source.cpp gets from
+	 * create_ndi_receiver_backend(): true tries to run NDI receive in the
+	 * separate ndi-server.exe helper process (falling back to direct NDIlib
+	 * calls if that helper can't be started), false always uses direct
+	 * NDIlib calls in-process.
+	 * Default: true. `--distroav-use-ndi-server=false` to disable.
+	 */
+	static bool UseNdiServer;
 
 	bool OutputEnabled;
 	QString OutputName;
