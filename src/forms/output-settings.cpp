@@ -34,6 +34,7 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QAbstractButton>
 
 OutputSettings::OutputSettings(QWidget *parent) : QDialog(parent), ui(new Ui::OutputSettings)
 {
@@ -47,6 +48,10 @@ OutputSettings::OutputSettings(QWidget *parent) : QDialog(parent), ui(new Ui::Ou
 		box->insertWidget(box->indexOf(ui->labelRequirements), monitorOffLabel);
 
 	connect(ui->buttonBox, SIGNAL(accepted()), this, SLOT(onFormAccepted()));
+
+	// Add an Apply button that applies changes but keeps the dialog open.
+	QAbstractButton *applyButton = ui->buttonBox->addButton(QDialogButtonBox::Apply);
+	connect(applyButton, &QAbstractButton::clicked, this, &OutputSettings::onFormAccepted);
 
 	// Listen for external config changes so the dialog can update while visible.
 	connect(ConfigNotifier::instance(), &ConfigNotifier::configChanged, this, &OutputSettings::onConfigChanged);
