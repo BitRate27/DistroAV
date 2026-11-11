@@ -25,7 +25,6 @@
 #include "update.h"
 #include "../config-notifier.h"
 
-#include <QBoxLayout>
 #include <QClipboard>
 #include <QDesktopServices>
 #include <QMessageBox>
@@ -39,13 +38,6 @@
 OutputSettings::OutputSettings(QWidget *parent) : QDialog(parent), ui(new Ui::OutputSettings)
 {
 	ui->setupUi(this);
-
-	monitorOffLabel = new QLabel(QString::fromUtf8("Network Monitor off"), this);
-	monitorOffLabel->setAlignment(Qt::AlignCenter);
-	monitorOffLabel->setStyleSheet("QLabel { color: #c62828; font-weight: bold; }");
-	monitorOffLabel->setVisible(false);
-	if (auto *box = qobject_cast<QBoxLayout *>(layout()))
-		box->insertWidget(box->indexOf(ui->labelRequirements), monitorOffLabel);
 
 	connect(ui->buttonBox, SIGNAL(accepted()), this, SLOT(onFormAccepted()));
 
@@ -387,19 +379,13 @@ void OutputSettings::onConfigChanged()
 void OutputSettings::refreshUI()
 {
 	auto config = Config::Current();
-	auto applyStatus = [](QLabel *label, bool ok, const QString &) {
-		label->setText(QString::fromUtf8("%1").arg(ok ? "✓" : "✗"));
-		label->setStyleSheet(ok ? "QWidget { color: #2e7d32; padding:0; }"
-					: "QWidget { color: #c62828; padding:0; }");
-	};
-
-	// Without the Network Monitor, discoverable/receiving can't be tracked: show
-	// them as unknown (grey) and say why.
+	// S/D/R indicators: green = yes, red = no, grey = unknown (Network Monitor off).
 	const bool monitorOn = network_monitor && network_monitor->isEnabled();
-	monitorOffLabel->setVisible(!monitorOn);
-	auto applyUnknown = [](QLabel *label, const QString &letter) {
-		label->setText(letter);
-		label->setStyleSheet("QWidget { color: #757575; padding:0; }");
+	auto applyIndicator = [this, monitorOn](QLabel *label, bool yes) {
+		const char *color = !monitorOn ? "#757575" : (yes ? "#2e7d32" : "#c62828");
+		label->setStyleSheet(QString("QWidget { color: %1; padding:0; }").arg(color));
+		label->setToolTip(monitorOn ? tr("Green S = Sending, D = Discoverable and R = Received.")
+					    : tr("Network monitor is off"));
 	};
 
 	// Enable Output (Main & Preview) settings as long as Main Output can be supported.
@@ -425,18 +411,9 @@ void OutputSettings::refreshUI()
 	ui->mainOutputName->setText(config->OutputName);
 	ui->mainOutputGroups->setText(config->OutputGroups);
 	auto mainSendInfo = network_monitor->getSenderInfo("NDI Main Output");
-	applyStatus(ui->mainOutputSending, mainSendInfo != nullptr, "S");
-
-	if (!monitorOn) {
-		applyUnknown(ui->mainOutputDiscoverable, "D");
-		applyUnknown(ui->mainOutputReceiving, "R");
-	} else if (mainSendInfo) {
-		applyStatus(ui->mainOutputDiscoverable, mainSendInfo->is_discoverable(), "D");
-		applyStatus(ui->mainOutputReceiving, mainSendInfo->get_receivers() > 0, "R");
-	} else {
-		applyStatus(ui->mainOutputDiscoverable, false, "D");
-		applyStatus(ui->mainOutputReceiving, false, "R");
-	}
+	applyIndicator(ui->mainOutputSending, mainSendInfo != nullptr);
+	applyIndicator(ui->mainOutputDiscoverable, mainSendInfo && mainSendInfo->is_discoverable());
+	applyIndicator(ui->mainOutputReceiving, mainSendInfo && mainSendInfo->get_receivers() > 0);
 
 	auto lastError = main_output_last_error();
 	ui->mainOutputLastError->setText(lastError);
@@ -459,18 +436,9 @@ void OutputSettings::refreshUI()
 	ui->previewOutputName->setText(config->PreviewOutputName);
 	ui->previewOutputGroups->setText(config->PreviewOutputGroups);
 	auto previewSendInfo = network_monitor->getSenderInfo("NDI Preview Output");
-	applyStatus(ui->previewOutputSending, previewSendInfo != nullptr, "S");
-
-	if (!monitorOn) {
-		applyUnknown(ui->previewOutputDiscoverable, "D");
-		applyUnknown(ui->previewOutputReceiving, "R");
-	} else if (previewSendInfo) {
-		applyStatus(ui->previewOutputDiscoverable, previewSendInfo->is_discoverable(), "D");
-		applyStatus(ui->previewOutputReceiving, previewSendInfo->get_receivers() > 0, "R");
-	} else {
-		applyStatus(ui->previewOutputDiscoverable, false, "D");
-		applyStatus(ui->previewOutputReceiving, false, "R");
-	}
+	applyIndicator(ui->previewOutputSending, previewSendInfo != nullptr);
+	applyIndicator(ui->previewOutputDiscoverable, previewSendInfo && previewSendInfo->is_discoverable());
+	applyIndicator(ui->previewOutputReceiving, previewSendInfo && previewSendInfo->get_receivers() > 0);
 
 	ui->tallyProgramCheckBox->setChecked(config->TallyProgramEnabled);
 	ui->tallyPreviewCheckBox->setChecked(config->TallyPreviewEnabled);
