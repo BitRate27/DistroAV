@@ -229,10 +229,9 @@ bool open_network_monitor_dialog()
 	layout->addLayout(footer);
 	layout->setAlignment(footer, Qt::AlignRight);
 
-	// Enables/disables the tabs and every button except Close (and the Monitor
-	// checkbox itself).
+	// Greys out every tab's content and all buttons except Close (and the Monitor
+	// checkbox itself). The tab bar stays enabled so the user can still switch tabs.
 	auto applyMonitorState = [tabWidget, helpBtn, dumpBtn, copyBtn](bool monitoring) {
-		tabWidget->tabBar()->setEnabled(monitoring);
 		for (int i = 0; i < tabWidget->count(); ++i)
 			tabWidget->widget(i)->setEnabled(monitoring);
 		helpBtn->setEnabled(monitoring);
